@@ -1,0 +1,11 @@
+{
+  "blacklist": [
+    "1.1.1.1"
+  ],
+  "whitelist": [
+    "127.0.0.1",
+    "::1"
+  ],
+  "rateLimit": 10,
+  "blockedCountries": []
+}
