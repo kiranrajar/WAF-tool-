@@ -272,6 +272,8 @@ app.use(async (req, res, next) => {
 
             if ((risk > config.riskThreshold || detectedType) && config.protectionMode === 'blocking') {
                 status = "Blocked";
+                if (!detectedType) type = "ML Anomaly Detection"; // Differentiate ML blocks from signatures
+                console.log(`🚨 BLOCKING: ${type} from ${ip} (Risk: ${risk.toFixed(3)})`);
                 sendSOCAlert({ type, ip, country, risk, payload: payload.substring(0, 100) });
             }
         }
@@ -364,6 +366,11 @@ app.get('/api/stats', (req, res) => {
         const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
 
         const blocked = logs.filter(l => l.status === "Blocked").length;
+
+        // Accurate Map Stats calculated from full historical logs
+        const mapCritical = logs.filter(l => l.status === "Blocked" && (l.risk >= 0.8 || l.type.includes('Honeypot'))).length;
+        const mapAnomalies = logs.filter(l => l.status === "Blocked" && (l.risk < 0.8 && !l.type.includes('Honeypot'))).length;
+
         const threats = logs.reduce((acc, l) => {
             if (l.type !== "Normal") acc[l.type] = (acc[l.type] || 0) + 1;
             return acc;
@@ -375,6 +382,8 @@ app.get('/api/stats', (req, res) => {
             allowed: logs.length - blocked,
             avgRisk: logs.length > 0 ? logs.reduce((acc, l) => acc + l.risk, 0) / logs.length : 0,
             threats,
+            mapCritical,
+            mapAnomalies,
             blacklistCount: blacklist.length,
             config
         });

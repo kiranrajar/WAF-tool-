@@ -115,7 +115,7 @@ async function syncData() {
 
         if (stats.total !== undefined) {
             updateUI(logs, stats);
-            updateMap(logs);
+            updateMap(logs, stats);
         }
     } catch (err) {
         console.warn("Retrying engine sync...");
@@ -331,7 +331,7 @@ function updateCharts(logs, stats) {
             stats.threats['XSS'] || 0,
             stats.threats['Path Traversal'] || 0,
             stats.threats['WebShell/RCE'] || 0,
-            stats.threats['Anomaly / Threat'] || 0
+            stats.threats['ML Anomaly Detection'] || 0
         ];
         vectorChart.data.datasets[0].data = threatProfile;
         vectorChart.update('none');
@@ -366,14 +366,14 @@ function showToast(msg) {
     area.appendChild(t);
     setTimeout(() => t.remove(), 4000);
 }
-function updateMap(logs) {
+function updateMap(logs, stats) {
     const mapContainer = document.getElementById('threat-map');
     if (!mapContainer) return;
 
-    // Pulse Map Stats
-    if (document.getElementById('map-critical')) {
-        document.getElementById('map-critical').innerText = logs.filter(l => l.status === "Blocked" && l.risk >= 0.8).length;
-        document.getElementById('map-anomalies').innerText = logs.filter(l => l.status === "Blocked" && l.risk < 0.8).length;
+    // Pulse Map Stats (Using accurate backend counters)
+    if (document.getElementById('map-critical') && stats) {
+        document.getElementById('map-critical').innerText = stats.mapCritical || 0;
+        document.getElementById('map-anomalies').innerText = stats.mapAnomalies || 0;
     }
 
     const now = Date.now();
