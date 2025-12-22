@@ -11,7 +11,7 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const TARGET_URL = process.env.TARGET_URL || 'https://example.com'; // Change this to your real site
+const TARGET_URL = process.env.TARGET_URL || 'https://httpbin.org';
 const LOG_FILE = path.join(__dirname, 'logs.json');
 const BLACKLIST_FILE = path.join(__dirname, 'blacklist.json');
 const REPUTATION_FILE = path.join(__dirname, 'reputation.json');
