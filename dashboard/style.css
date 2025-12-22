@@ -1074,19 +1074,179 @@ tr:hover td {
     background: transparent;
     border: 1px solid var(--border);
 }
+
 /* Command Center - Global Map */
-.map-card { grid-column: span 2; background: radial-gradient(circle at center, #1b2735 0%, #090a0f 100%); min-height: 400px !important; padding: 1.5rem !important; }
-.map-container { position: relative; width: 100%; height: 300px; margin: 1rem 0; background: url('https://upload.wikimedia.org/wikipedia/commons/8/80/World_map_-_blue_dots.svg') no-repeat center; background-size: contain; opacity: 0.6; }
-.map-placeholder { display: flex; align-items: center; justify-content: center; height: 100%; }
-.map-overlay { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--accent); text-transform: uppercase; letter-spacing: 2px; border: 1px solid var(--accent-dim); padding: 8px 16px; background: rgba(0,0,0,0.4); }
-.map-stats { display: flex; gap: 2rem; }
-.map-stat-item { display: flex; align-items: center; gap: 0.5rem; }
-.map-stat-item .dot { width: 10px; height: 10px; border-radius: 50%; }
-.map-stat-item .dot.danger { background: var(--danger); box-shadow: 0 0 10px var(--danger); }
-.map-stat-item .dot.warning { background: var(--warning); box-shadow: 0 0 10px var(--warning); }
-.attack-ping { position: absolute; width: 10px; height: 10px; background: var(--danger); border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 15px var(--danger); }
-.attack-ping::after { content: ''; position: absolute; width: 100%; height: 100%; border-radius: 50%; border: 2px solid var(--danger); animation: ping-pulse 1.5s ease-out infinite; }
-@keyframes ping-pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(4); opacity: 0; } }
-.pulse { display: inline-block; width: 8px; height: 8px; background: var(--success); border-radius: 50%; animation: pulse-anim 1s infinite alternate; }
-@keyframes pulse-anim { from { opacity: 0.3; } to { opacity: 1; } }
-.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.map-card {
+    grid-column: span 2;
+    background: radial-gradient(circle at top, #161b22, #0d1117);
+    min-height: 480px !important;
+    padding: 1.5rem !important;
+    border: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+}
+
+.map-container {
+    position: relative;
+    width: 100%;
+    height: 350px;
+    margin: 1rem 0;
+    background:
+        linear-gradient(rgba(0, 255, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 255, 0.05) 1px, transparent 1px),
+        url('https://upload.wikimedia.org/wikipedia/commons/8/80/World_map_-_blue_dots.svg') no-repeat center;
+    background-size: 40px 40px, 40px 40px, contain;
+    opacity: 0.8;
+    border-radius: 12px;
+    background-color: #0b0e14;
+    border: 1px solid rgba(0, 255, 255, 0.1);
+}
+
+.map-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    pointer-events: none;
+}
+
+.map-overlay {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    background: rgba(13, 17, 23, 0.8);
+    padding: 10px 20px;
+    border-radius: 4px;
+    border: 1px solid var(--accent);
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+    animation: scanner-flicker 2s infinite;
+}
+
+@keyframes scanner-flicker {
+
+    0%,
+    100% {
+        opacity: 0.8;
+    }
+
+    50% {
+        opacity: 1;
+    }
+}
+
+.map-stats {
+    display: flex;
+    gap: 3rem;
+    margin-top: 1rem;
+}
+
+.map-stat-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.map-stat-item .dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.map-stat-item .dot.danger {
+    background: #ff4d4d;
+    box-shadow: 0 0 10px #ff4d4d;
+}
+
+.map-stat-item .dot.warning {
+    background: #ffa500;
+    box-shadow: 0 0 10px #ffa500;
+}
+
+.map-stat-item .label {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.map-stat-item .value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.attack-ping {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    background: #ff3e3e;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 25px #ff3e3e;
+    z-index: 100;
+}
+
+.attack-ping::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 2px solid #ff3e3e;
+    animation: ping-pulse 2s ease-out infinite;
+}
+
+@keyframes ping-pulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(6);
+        opacity: 0;
+    }
+}
+
+.live-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #4cd964;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.pulse {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #4cd964;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #4cd964;
+    animation: blink-soft 1.5s infinite alternate;
+}
+
+@keyframes blink-soft {
+    from {
+        opacity: 0.4;
+        transform: scale(0.9);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1.1);
+    }
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
