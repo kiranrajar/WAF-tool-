@@ -1,0 +1,32 @@
+{
+    "version": 2,
+    "name": "aegis-shield-waf",
+    "builds": [
+        {
+            "src": "backend/waf-enhanced.js",
+            "use": "@vercel/node"
+        },
+        {
+            "src": "ml/api.py",
+            "use": "@vercel/python"
+        },
+        {
+            "src": "dashboard/**",
+            "use": "@vercel/static"
+        }
+    ],
+    "routes": [
+        {
+            "src": "/api/(.*)",
+            "dest": "backend/waf-enhanced.js"
+        },
+        {
+            "src": "/score",
+            "dest": "ml/api.py"
+        },
+        {
+            "src": "/(.*)",
+            "dest": "dashboard/$1"
+        }
+    ]
+}
