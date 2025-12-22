@@ -36,7 +36,8 @@ if (!fs.existsSync(CONFIG_FILE)) {
         blockedCountries: ['CN', 'RU', 'KP'],
         rateLimit: 100,
         riskThreshold: 0.88,
-        protectionMode: 'blocking' // 'learning' or 'blocking'
+        protectionMode: 'blocking',
+        targetUrl: 'http://localhost:5000'
     }));
 }
 
@@ -229,22 +230,40 @@ app.use(async (req, res, next) => {
     }
 });
 
-// Primary Reverse Proxy
+// Primary Reverse Proxy with Dynamic Target
 app.use('/', limiter, (req, res, next) => {
     // Skip if internal
     if (req.url.startsWith('/api/') || req.url.startsWith('/dashboard') || req.url === '/health') {
         return next();
     }
 
+    const config = JSON.parse(fs.readFileSync(CONFIG_FILE));
+    const dynamicTarget = config.targetUrl || TARGET_URL;
+
     createProxyMiddleware({
-        target: TARGET_URL,
+        target: dynamicTarget,
         changeOrigin: true,
-        onError: (err, req, res) => {
-            res.status(502).send('<h1>502 Bad Gateway</h1><p>AEGIS Shield: Could not reach target application.</p>');
-        },
+        secure: false, // For local self-signed certs
+        ws: true, // Support WebSockets
+        xfwd: true, // Forward headers
         onProxyReq: (proxyReq, req, res) => {
             proxyReq.setHeader('X-Protected-By', 'AEGIS-Shield-v3');
             proxyReq.setHeader('X-Real-IP', req.ip);
+            // Ensure host header matches target for external sites
+            if (dynamicTarget.includes('http')) {
+                const targetHost = new URL(dynamicTarget).host;
+                proxyReq.setHeader('host', targetHost);
+            }
+        },
+        onError: (err, req, res) => {
+            console.error('Proxy Error:', err.message);
+            res.status(502).send(`
+                <div style="font-family: sans-serif; padding: 50px; text-align: center; background: #0d1117; color: #c9d1d9; height: 100vh;">
+                    <h1 style="color: #f85149;">502 Bad Gateway</h1>
+                    <p>AEGIS Shield: Could not reach the destination server [${dynamicTarget}].</p>
+                    <p style="color: #8b949e; font-size: 0.9em;">Check if the Target URL in your dashboard is correct and online.</p>
+                </div>
+            `);
         }
     })(req, res, next);
 });

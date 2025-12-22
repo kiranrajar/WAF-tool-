@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Configuration Sync
     document.getElementById('save-config')?.addEventListener('click', async () => {
         const config = {
+            targetUrl: document.getElementById('cfg-target').value,
             rateLimit: parseInt(document.getElementById('cfg-rate-limit').value),
             riskThreshold: parseFloat(document.getElementById('cfg-threshold').value) / 100,
             blockedCountries: document.getElementById('cfg-geo').value.split(',').map(s => s.trim().toUpperCase()),
@@ -117,6 +118,7 @@ function updateUI(logs, stats) {
 
     // Config Fields
     if (document.getElementById('cfg-rate-limit')) {
+        document.getElementById('cfg-target').value = config.targetUrl || 'http://localhost:5000';
         document.getElementById('cfg-rate-limit').value = config.rateLimit;
         document.getElementById('cfg-threshold').value = Math.round(config.riskThreshold * 100);
         document.getElementById('cfg-geo').value = config.blockedCountries?.join(', ');
