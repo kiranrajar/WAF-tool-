@@ -39,10 +39,11 @@ catch {
 
 Write-Host "`n🚀 QUICK ACTIONS" -ForegroundColor Yellow
 Write-Host "  1. View Dashboard:" -ForegroundColor White
-Write-Host "     Start-Process http://localhost:3000/`n" -ForegroundColor Gray
+Write-Host "     Start-Process http://localhost:3000/dashboard`n" -ForegroundColor Gray
 
 Write-Host "  2. Test Attack Detection:" -ForegroundColor White
-Write-Host "     Invoke-WebRequest -Uri `"http://localhost:3000/test?sql=admin' OR 1=1`" -UseBasicParsing`n" -ForegroundColor Gray
+Write-Host '     Invoke-WebRequest -Uri "http://localhost:3000/test?sql=admin'' OR 1=1" -UseBasicParsing' -ForegroundColor Gray
+Write-Host ""
 
 Write-Host "  3. View Logs:" -ForegroundColor White
 Write-Host "     Invoke-RestMethod -Uri http://localhost:3000/api/logs`n" -ForegroundColor Gray
