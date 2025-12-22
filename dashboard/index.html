@@ -101,14 +101,30 @@
             </section>
 
             <section class="dashboard-grid">
-                <div class="card">
-                    <h3>Threat Velocity</h3>
-                    <canvas id="velocityChart"></canvas>
+                <div class="card map-card">
+                    <div class="card-header">
+                        <h3>Global Threat Landscape</h3>
+                        <div class="live-indicator"><span class="pulse"></span> LIVE FEEDS</div>
+                    </div>
+                    <div class="map-container" id="threat-map">
+                        <div class="map-placeholder">
+                            <div class="map-overlay">Scanning Global Traffic...</div>
+                        </div>
+                    </div>
+                    <div class="map-stats">
+                        <div class="map-stat-item">
+                            <span class="dot danger"></span>
+                            <span class="label">Critical Blocks</span>
+                            <span class="value" id="map-critical">0</span>
+                        </div>
+                        <div class="map-stat-item">
+                            <span class="dot warning"></span>
+                            <span class="label">Anomalies</span>
+                            <span class="value" id="map-anomalies">0</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="card">
-                    <h3>Attack Distribution</h3>
-                    <canvas id="vectorChart"></canvas>
-                </div>
+                <!-- Move Attack Distribution here if needed or keep it separate -->
             </section>
 
             <section class="data-table-container">

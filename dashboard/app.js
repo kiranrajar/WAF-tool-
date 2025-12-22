@@ -1,5 +1,11 @@
-let velocityChart, vectorChart;
 const API_BASE = "/api";
+const COUNTRY_COORDS = {
+    'US': { x: 20, y: 40 }, 'CN': { x: 80, y: 45 }, 'RU': { x: 75, y: 25 },
+    'GB': { x: 47, y: 30 }, 'DE': { x: 50, y: 32 }, 'FR': { x: 48, y: 35 },
+    'IN': { x: 72, y: 55 }, 'BR': { x: 33, y: 70 }, 'AU': { x: 88, y: 80 },
+    'CA': { x: 20, y: 25 }, 'JP': { x: 90, y: 40 }, 'KP': { x: 86, y: 40 },
+    'IR': { x: 65, y: 45 }, 'UA': { x: 58, y: 33 }, 'XX': { x: 50, y: 50 }
+};
 
 document.addEventListener('DOMContentLoaded', () => {
     initCharts();
@@ -102,6 +108,7 @@ async function syncData() {
         currentConfig = stats.config || {};
 
         updateUI(logs, stats);
+        updateMap(logs);
     } catch (err) {
         console.error("Engine connectivity lost");
     }
@@ -331,4 +338,33 @@ function showToast(msg) {
     t.innerText = msg;
     area.appendChild(t);
     setTimeout(() => t.remove(), 4000);
+}
+function updateMap(logs) {
+    const mapContainer = document.getElementById('threat-map');
+    if (!mapContainer) return;
+
+    // Update Map Statistics
+    if (document.getElementById('map-critical')) {
+        document.getElementById('map-critical').textContent = logs.filter(l => l.status === "Blocked" && l.risk > 0.9).length;
+        document.getElementById('map-anomalies').textContent = logs.filter(l => l.status === "Blocked" && l.risk <= 0.9).length;
+    }
+
+    // Only process recent blocks
+    const now = Date.now();
+    const recentBlocks = logs.filter(l => l.status === "Blocked" && (now - l.timestamp < 10000));
+
+    recentBlocks.forEach(log => {
+        const id = `ping-${log.timestamp}`;
+        if (document.getElementById(id)) return;
+
+        const pos = COUNTRY_COORDS[log.country] || COUNTRY_COORDS['XX'];
+        const ping = document.createElement('div');
+        ping.className = 'attack-ping';
+        ping.id = id;
+        ping.style.left = `${pos.x}%`;
+        ping.style.top = `${pos.y}%`;
+
+        mapContainer.appendChild(ping);
+        setTimeout(() => ping.remove(), 2000);
+    });
 }
