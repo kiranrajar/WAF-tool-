@@ -17,6 +17,31 @@ const TARGET_URL = process.env.TARGET_URL || 'http://localhost:5000'; // Default
 const MONGODB_URI = process.env.MONGODB_URI;
 const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK;
 
+// Apex Alert System
+async function sendSOCAlert(data) {
+    console.log(`📡 [SOC ALERT] ${data.type} detected from ${data.ip} (${data.country})`);
+    if (DISCORD_WEBHOOK) {
+        try {
+            await axios.post(DISCORD_WEBHOOK, {
+                embeds: [{
+                    title: `🛡️ AEGIS Shield: Critical Alert`,
+                    color: 15548997, // Red
+                    fields: [
+                        { name: "Event Type", value: data.type, inline: true },
+                        { name: "IP Address", value: data.ip, inline: true },
+                        { name: "Country", value: data.country, inline: true },
+                        { name: "Risk Score", value: `${(data.risk * 100).toFixed(1)}%`, inline: true },
+                        { name: "Payload", value: `\`\`\`${data.payload?.substring(0, 100) || 'N/A'}\`\`\`` }
+                    ],
+                    timestamp: new Date().toISOString()
+                }]
+            });
+        } catch (err) {
+            console.error('❌ Failed to send Discord alert');
+        }
+    }
+}
+
 // Connect to MongoDB
 if (MONGODB_URI) {
     mongoose.connect(MONGODB_URI)
@@ -56,6 +81,26 @@ const limiter = rateLimit({
     message: { error: "Too many requests. AEGIS DDoS Protection active." },
     standardHeaders: true,
     legacyHeaders: false,
+});
+
+// Honeypot Routes (Invisible Traps)
+app.get(['/.env', '/admin_setup', '/wp-admin', '/phpmyadmin', '/backup.zip'], (req, res) => {
+    const ip = req.ip.replace('::ffff:', '');
+    console.log(`🪤 Honeypot Triggered! IP: ${ip} touched ${req.url}`);
+
+    // Immediate Permanent Blacklist
+    const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
+    if (!blacklist.find(b => b.ip === ip)) {
+        blacklist.push({ ip, reason: `WAF Honeypot: ${req.url}`, timestamp: Date.now() });
+        fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(blacklist, null, 2));
+    }
+
+    sendSOCAlert({
+        type: "Honeypot Triggered (Auto-Blacklisted)",
+        ip, country: "XX", risk: 1.0, payload: `Accessed sensitive path: ${req.url}`
+    });
+
+    return res.status(403).send(getBlockPage(ip, "WAF Honeypot Activated", "HONEY-TRAP"));
 });
 
 // Serve static files (Dashboard)
@@ -136,6 +181,24 @@ function extractFeatures(req) {
     return [length, specDensity, sqli + trauma, xss + rce, encodedChars, entropy];
 }
 
+// Bot Detection Fingerprinting
+function getFingerprintRisk(req) {
+    let risk = 0;
+    const ua = req.headers['user-agent'] || '';
+
+    // 1. Check for common headless browser markers
+    if (ua.includes('Headless') || ua.includes('Puppeteer') || ua.includes('Playwright')) risk += 0.5;
+
+    // 2. Check for missing common headers usually present in real browsers
+    if (!req.headers['accept-language']) risk += 0.2;
+    if (!req.headers['accept']) risk += 0.1;
+
+    // 3. Check for scripting languages as browsers
+    if (ua.includes('python-requests') || ua.includes('Go-http-client') || ua.includes('node-fetch')) risk += 0.4;
+
+    return risk;
+}
+
 async function logRequest(logData) {
     try {
         if (MONGODB_URI) {
@@ -180,32 +243,37 @@ app.use(async (req, res, next) => {
 
         // 3. Rate Limiting check is handled by middleware but we can add manual logic if needed.
 
-        // 4. ML & Signature Inspection
+        // 4. ML & Signature Inspection & Fingerprinting
         const features = extractFeatures(req);
-        let risk = 0.5;
-        let type = "Normal";
+        const botRisk = getFingerprintRisk(req);
+        let risk = 0.5 + botRisk;
+        let type = botRisk > 0.4 ? "Automated Bot/Script" : "Normal";
 
         // Try ML Engine
         try {
             const mlRes = await axios.post("http://localhost:8000/score", { features }, { timeout: 2000 });
-            risk = mlRes.data.risk;
+            risk = (mlRes.data.risk + botRisk) / 1.5; // Merge bot risk with ML anomaly score
         } catch (err) {
             // Fallback to heuristic
-            risk = (features[1] * 2 + (features[2] + features[3]) * 0.5 + features[5] * 0.1) / 3;
+            risk = (features[1] * 2 + (features[2] + features[3]) * 0.5 + features[5] * 0.1 + botRisk) / 3;
         }
 
         // Signature check
         const payload = req.url + JSON.stringify(req.body);
+        const decodedPayload = decodeURIComponent(payload);
         const detectedType = Object.keys(SIGNATURES).find(cat =>
-            SIGNATURES[cat].some(p => p.test(decodeURIComponent(payload)))
+            SIGNATURES[cat].some(p => p.test(decodedPayload))
         );
 
-        if (detectedType) type = detectedType;
-        else if (risk > 0.7) type = "Anomaly Detected";
+        if (detectedType) {
+            type = detectedType;
+            risk = 1.0;
+        }
 
         let status = "Allowed";
         if ((risk > config.riskThreshold || detectedType) && config.protectionMode === 'blocking') {
             status = "Blocked";
+            sendSOCAlert({ type, ip, country, risk, payload: payload.substring(0, 100) });
             console.log(`🚨 ATTACK DETECTED: ${type} from ${ip} (Risk: ${risk.toFixed(3)})`);
         }
 
@@ -246,6 +314,26 @@ app.use('/', limiter, (req, res, next) => {
         secure: false, // For local self-signed certs
         ws: true, // Support WebSockets
         xfwd: true, // Forward headers
+        onProxyRes: (proxyRes, req, res) => {
+            // Inject Honeypot Link into HTML responses
+            if (proxyRes.headers['content-type']?.includes('text/html')) {
+                const originalWrite = res.write;
+                const originalEnd = res.end;
+                let body = '';
+
+                res.write = function (chunk) { body += chunk; };
+                res.end = function (chunk) {
+                    if (chunk) body += chunk;
+                    // Inject a hidden honeypot link before </body>
+                    const honeyLink = '<a href="/admin_setup" style="display:none;" aria-hidden="true">Admin Panel</a>';
+                    body = body.replace('</body>', `${honeyLink}</body>`);
+
+                    res.setHeader('content-length', Buffer.byteLength(body));
+                    originalWrite.call(res, body);
+                    originalEnd.call(res);
+                };
+            }
+        },
         onProxyReq: (proxyReq, req, res) => {
             proxyReq.setHeader('X-Protected-By', 'AEGIS-Shield-v3');
             proxyReq.setHeader('X-Real-IP', req.ip);
