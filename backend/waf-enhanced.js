@@ -15,6 +15,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const TARGET_URL = process.env.TARGET_URL || 'https://httpbin.org';
 const MONGODB_URI = process.env.MONGODB_URI;
+const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK; // Optional for alerts
 
 // Connect to MongoDB if URI is provided
 if (MONGODB_URI) {
@@ -97,9 +98,42 @@ function extractFeatures(payload) {
     return [length, specDensity, sqli + trauma, xss + rce, encodedChars, entropy];
 }
 
-function detectBot(userAgent) {
-    const botPatterns = [/bot/i, /crawler/i, /spider/i, /scraper/i, /curl/i, /wget/i];
-    return botPatterns.some(pattern => pattern.test(userAgent));
+function detectBot(req) {
+    const userAgent = req.get('user-agent') || 'Unknown';
+    const botPatterns = [/bot/i, /crawler/i, /spider/i, /scraper/i, /curl/i, /wget/i, /headless/i];
+    const isBasicBot = botPatterns.some(pattern => pattern.test(userAgent));
+
+    // Passive Fingerprinting (Advanced Bot Shield)
+    const hasHeadlessHeaders = !req.get('accept-language') || !req.get('accept');
+    const isAutomationTool = req.get('x-puppeteer-version') || req.get('webdriver');
+
+    return {
+        isBot: isBasicBot || hasHeadlessHeaders || isAutomationTool,
+        type: isBasicBot ? "Known Bot" : (hasHeadlessHeaders ? "Headless Browser" : "Automation Tool")
+    };
+}
+
+async function sendAlert(attackData) {
+    if (!DISCORD_WEBHOOK) return;
+    try {
+        await axios.post(DISCORD_WEBHOOK, {
+            embeds: [{
+                title: "🚨 High-Risk Security Event Blocked",
+                color: 0xef4444,
+                fields: [
+                    { name: "Threat Type", value: attackData.type, inline: true },
+                    { name: "Risk Score", value: `${(attackData.risk * 100).toFixed(1)}%`, inline: true },
+                    { name: "IP Address", value: attackData.ip, inline: true },
+                    { name: "Country", value: attackData.country, inline: true },
+                    { name: "Payload", value: `\`${attackData.url.substring(0, 100)}\`` }
+                ],
+                footer: { text: "AEGIS Shield Sentinel System" },
+                timestamp: new Date().toISOString()
+            }]
+        });
+    } catch (err) {
+        console.error('Failed to send alert:', err.message);
+    }
 }
 
 async function logRequest(logData) {
@@ -201,10 +235,9 @@ app.use(async (req, res, next) => {
         const geo = geoip.lookup(ip);
         const country = geo ? geo.country : 'XX';
 
-        // Bot detection
-        const isBot = detectBot(userAgent);
+        // Advanced Bot Shield
+        const botData = detectBot(req);
         const uaParser = new UAParser(userAgent);
-        const browser = uaParser.getBrowser();
 
         // Blacklist check
         if (MONGODB_URI) {
@@ -257,12 +290,17 @@ app.use(async (req, res, next) => {
         // Decision
         if (risk > 0.88 || detectedType) {
             status = "Blocked";
-            const updatedRep = updateReputation(ip, -20);
+            const updatedRep = await updateReputation(ip, -20);
 
             console.log(`🚨 ATTACK DETECTED: ${type} from ${ip} (risk: ${(risk * 100).toFixed(1)}%)`);
 
+            // Master Phase: Real-Time Alerts
+            if (risk > 0.92 || detectedType) {
+                sendAlert({ ip, country, type, risk, url: req.url });
+            }
+
             if (updatedRep.score < -50) {
-                addToBlacklist(ip, `Auto-blocked: ${type} (${updatedRep.attacks} attacks)`);
+                await addToBlacklist(ip, `Auto-blocked: ${type} (${updatedRep.attacks} attacks)`);
             }
         }
 
@@ -277,7 +315,8 @@ app.use(async (req, res, next) => {
             status,
             type,
             responseTime: Date.now() - startTime,
-            isBot
+            isBot: botData.isBot,
+            botInfo: botData.type
         });
 
         if (status === "Blocked") {

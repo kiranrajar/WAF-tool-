@@ -853,3 +853,79 @@ tr:hover td {
         grid-template-columns: repeat(2, 1fr);
     }
 }
+
+/* Mastery Phase Additions */
+.fingerprint-tag {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    display: inline-block;
+}
+
+.tag-bot {
+    background: var(--danger-dim);
+    color: var(--danger);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.tag-human {
+    background: var(--success-dim);
+    color: var(--success);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.geo-map-container {
+    margin-bottom: 1.5rem;
+    height: 180px;
+}
+
+.heatmap-placeholder {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(45deg, #0b0e11 25%, #161a1f 25%, #161a1f 50%, #0b0e11 50%, #0b0e11 75%, #161a1f 75%, #161a1f 100%);
+    background-size: 20px 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.heatmap-placeholder::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 200%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.05), transparent);
+    animation: scan 3s linear infinite;
+}
+
+@keyframes scan {
+    from {
+        transform: translateX(0);
+    }
+
+    to {
+        transform: translateX(50%);
+    }
+}
+
+.heatmap-overlay {
+    font-size: 0.75rem;
+    color: var(--accent);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 8px 16px;
+    border-radius: 4px;
+    backdrop-filter: blur(4px);
+    border: 1px solid var(--accent-dim);
+    z-index: 1;
+}

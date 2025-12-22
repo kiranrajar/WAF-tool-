@@ -81,6 +81,11 @@ function updateUI(logs, stats, config) {
             <td>${log.ip}</td>
             <td><span style="font-size: 1.2rem; margin-right: 5px;">${getFlag(log.country)}</span> ${log.country}</td>
             <td title="${log.url}">${log.url.substring(0, 25)}${log.url.length > 25 ? '...' : ''}</td>
+            <td>
+                <span class="fingerprint-tag ${log.isBot ? 'tag-bot' : 'tag-human'}">
+                    ${log.isBot ? (log.botInfo || 'Automated') : 'Browser'}
+                </span>
+            </td>
             <td><span style="color: ${log.type === 'Normal' ? 'var(--text-muted)' : 'var(--warning)'}">${log.type}</span></td>
             <td>
                 <span class="risk-dot" style="background: ${getRiskColor(log.risk)}"></span>
@@ -139,14 +144,24 @@ function updateThreatBar(id, count, total) {
 function updateGeoStats(logs) {
     const geoCount = {};
     logs.forEach(log => {
-        geoCount[log.country] = (geoCount[log.country] || 0) + 1;
+        if (log.type !== 'Normal') {
+            geoCount[log.country] = (geoCount[log.country] || 0) + 1;
+        }
     });
 
-    const geoMap = { 'US': 'geo-us', 'CN': 'geo-cn', 'RU': 'geo-ru', 'BR': 'geo-br', 'DE': 'geo-de' };
-    Object.keys(geoMap).forEach(country => {
-        const elem = document.getElementById(geoMap[country]);
-        if (elem) elem.innerText = geoCount[country] || 0;
-    });
+    const geoStatsElem = document.getElementById('geo-stats');
+    if (!geoStatsElem) return;
+
+    const sortedCountries = Object.entries(geoCount)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 6);
+
+    geoStatsElem.innerHTML = sortedCountries.map(([country, count]) => `
+        <div class="geo-item">
+            <span class="geo-country">${getFlag(country)} ${country}</span>
+            <span class="geo-count">${count} Threats</span>
+        </div>
+    `).join('') || '<div class="geo-item"><span class="geo-country">No global threats detected</span></div>';
 }
 
 function getRiskColor(risk) {

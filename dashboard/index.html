@@ -120,6 +120,7 @@
                                 <th>Source IP</th>
                                 <th>Region</th>
                                 <th>Endpoint</th>
+                                <th>Fingerprint</th>
                                 <th>Classification</th>
                                 <th>Risk</th>
                                 <th>Status</th>
@@ -237,27 +238,13 @@
                 </div>
                 <div class="card">
                     <h3>Geographic Risk Assessment</h3>
+                    <div class="geo-map-container">
+                        <div id="geo-heatmap" class="heatmap-placeholder">
+                            <div class="heatmap-overlay">Real-time Threat Cluster Analysis Active</div>
+                        </div>
+                    </div>
                     <div class="geo-stats" id="geo-stats">
-                        <div class="geo-item">
-                            <span class="geo-country">United States</span>
-                            <span class="geo-count" id="geo-us">0</span>
-                        </div>
-                        <div class="geo-item">
-                            <span class="geo-country">China</span>
-                            <span class="geo-count" id="geo-cn">0</span>
-                        </div>
-                        <div class="geo-item">
-                            <span class="geo-country">Russia</span>
-                            <span class="geo-count" id="geo-ru">0</span>
-                        </div>
-                        <div class="geo-item">
-                            <span class="geo-country">Brazil</span>
-                            <span class="geo-count" id="geo-br">0</span>
-                        </div>
-                        <div class="geo-item">
-                            <span class="geo-country">Germany</span>
-                            <span class="geo-count" id="geo-de">0</span>
-                        </div>
+                        <!-- Countries will be injected here -->
                     </div>
                 </div>
             </div>
