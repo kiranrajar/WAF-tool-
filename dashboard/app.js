@@ -20,61 +20,112 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Simulation
-    document.getElementById('sim-normal').addEventListener('click', () => {
-        const endpoints = ['/api/v1/auth', '/home', '/dashboard', '/products?id=105'];
-        fetch(`http://localhost:3000${endpoints[Math.floor(Math.random() * endpoints.length)]}`);
+    // Configuration Sync
+    document.getElementById('save-config')?.addEventListener('click', async () => {
+        const config = {
+            rateLimit: parseInt(document.getElementById('cfg-rate-limit').value),
+            riskThreshold: parseFloat(document.getElementById('cfg-threshold').value) / 100,
+            blockedCountries: document.getElementById('cfg-geo').value.split(',').map(s => s.trim().toUpperCase()),
+            protectionMode: document.getElementById('protection-mode').value
+        };
+
+        const res = await fetch(`${API_BASE}/config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+
+        if (res.ok) showToast("✅ Security policy updated and deployed");
     });
 
-    document.getElementById('sim-attack').addEventListener('click', () => {
-        const threats = [
-            "/login?user=admin' OR 1=1--",
-            "/search?q=<img src=x onerror=alert(1)>",
-            "/?file=../../etc/passwd",
-            "/upload?exec=system('cat /etc/shadow')",
-            "/api/user/delete?id=1'; DROP TABLE users;--"
-        ];
-        fetch(`http://localhost:3000${threats[Math.floor(Math.random() * threats.length)]}`);
+    document.getElementById('protection-mode')?.addEventListener('change', () => {
+        document.getElementById('save-config').click();
+    });
+
+    // Refresh Data
+    document.getElementById('refresh-data')?.addEventListener('click', syncData);
+
+    // Modal Logic
+    const modal = document.getElementById('sim-modal');
+    document.getElementById('open-sim')?.addEventListener('click', () => modal.classList.add('active'));
+    document.getElementById('close-sim')?.addEventListener('click', () => modal.classList.remove('active'));
+
+    // Simulator Actions
+    document.querySelectorAll('.sim-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const type = btn.getAttribute('data-type');
+            const targets = {
+                sqli: "/login?user=admin' OR 1=1--",
+                xss: "/search?q=<script>alert(1)</script>",
+                traversal: "/file?path=../../etc/passwd",
+                rce: "/cmd?exec=rm -rf /",
+                normal: "/"
+            };
+
+            showToast(`🚀 Sending ${type.toUpperCase()} request...`);
+            fetch(`http://localhost:3000${targets[type] || '/'}`);
+            modal.classList.remove('active');
+        });
     });
 
     // Firewall
     document.getElementById('btn-add-ip').addEventListener('click', async () => {
         const ip = document.getElementById('add-ip-field').value;
         if (ip) {
-            showToast(`⚠️ Adding ${ip} to blacklist...`);
+            showToast(`⚠️ Blacklisting ${ip}...`);
+            await fetch(`${API_BASE}/config`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...currentConfig,
+                    blacklist: [...(currentConfig.blacklist || []), ip]
+                })
+            });
             document.getElementById('add-ip-field').value = '';
+            syncData();
         }
     });
 });
 
+let currentConfig = {};
+
 async function syncData() {
     try {
-        const [logsRes, statsRes, configRes] = await Promise.all([
+        const [logsRes, statsRes] = await Promise.all([
             fetch(`${API_BASE}/logs`),
-            fetch(`${API_BASE}/stats`),
-            fetch(`${API_BASE}/config`)
+            fetch(`${API_BASE}/stats`)
         ]);
 
         const logs = await logsRes.json();
         const stats = await statsRes.json();
-        const config = await configRes.json();
+        currentConfig = stats.config || {};
 
-        updateUI(logs, stats, config);
+        updateUI(logs, stats);
     } catch (err) {
         console.error("Engine connectivity lost");
     }
 }
 
-function updateUI(logs, stats, config) {
+function updateUI(logs, stats) {
+    const config = stats.config || {};
+
     // Stats Cards
     document.getElementById('stat-total').innerText = stats.total;
     document.getElementById('stat-blocked').innerText = stats.blocked;
     document.getElementById('stat-risk').innerText = stats.avgRisk.toFixed(3);
     document.getElementById('stat-bans').innerText = stats.blacklistCount;
 
+    // Config Fields
+    if (document.getElementById('cfg-rate-limit')) {
+        document.getElementById('cfg-rate-limit').value = config.rateLimit;
+        document.getElementById('cfg-threshold').value = Math.round(config.riskThreshold * 100);
+        document.getElementById('cfg-geo').value = config.blockedCountries?.join(', ');
+        document.getElementById('protection-mode').value = config.protectionMode;
+    }
+
     // Table
     const tbody = document.getElementById('log-body');
-    const recent = [...logs].reverse().slice(0, 12);
+    const recent = [...logs].slice(0, 12);
     tbody.innerHTML = recent.map(log => `
         <tr>
             <td>${log.time}</td>

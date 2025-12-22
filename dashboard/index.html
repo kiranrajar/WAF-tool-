@@ -65,11 +65,18 @@
                     <p>Real-time anomaly detection and traffic analysis</p>
                 </div>
                 <div class="controls-panel">
-                    <button id="sim-normal" class="btn">
-                        Simulate Traffic
+                    <div class="mode-toggle">
+                        <label>Protection Mode:</label>
+                        <select id="protection-mode" class="select-field">
+                            <option value="blocking">🛡️ Blocking</option>
+                            <option value="learning">🎓 Learning</option>
+                        </select>
+                    </div>
+                    <button id="refresh-data" class="btn">
+                        Force Refresh
                     </button>
-                    <button id="sim-attack" class="btn btn-danger">
-                        Simulate Attack
+                    <button id="open-sim" class="btn btn-outline" style="opacity: 0.5;">
+                        Attack Simulator
                     </button>
                 </div>
             </header>
@@ -151,28 +158,22 @@
                     </div>
                 </div>
                 <div class="card firewall-card">
-                    <h3>Active Protection Rules</h3>
-                    <div class="rules-list">
-                        <div class="rule-item">
-                            <span class="rule-name">Auto-Block Threshold</span>
-                            <span class="rule-value">92%</span>
+                    <h3>Policy Configuration</h3>
+                    <div class="settings-form">
+                        <div class="form-item">
+                            <label>Rate Limit (Req/Min)</label>
+                            <input type="number" id="cfg-rate-limit" value="100">
                         </div>
-                        <div class="rule-item">
-                            <span class="rule-name">Reputation Penalty</span>
-                            <span class="rule-value danger-text">-20 pts/attack</span>
+                        <div class="form-item">
+                            <label>Risk Threshold (%)</label>
+                            <input type="number" id="cfg-threshold" value="88">
                         </div>
-                        <div class="rule-item">
-                            <span class="rule-name">Rate Limit</span>
-                            <span class="rule-value">15 req/min</span>
+                        <div class="form-item">
+                            <label>Geo-Blocked Countries (ISO)</label>
+                            <input type="text" id="cfg-geo" placeholder="CN, RU, KP">
                         </div>
-                        <div class="rule-item">
-                            <span class="rule-name">DDoS Mitigation</span>
-                            <span class="rule-value">Enabled</span>
-                        </div>
-                        <div class="rule-item">
-                            <span class="rule-name">ML Engine Status</span>
-                            <span class="rule-value">Active</span>
-                        </div>
+                        <button id="save-config" class="btn btn-block" style="margin-top: 15px;">Save Security
+                            Policy</button>
                     </div>
                 </div>
             </div>
@@ -361,8 +362,27 @@
         </div>
     </main>
 
+    <div id="sim-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Security Lab: Attack Simulator</h3>
+                <button id="close-sim" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Test your security policies by triggering controlled attack vectors.</p>
+                <div class="sim-grid">
+                    <button class="sim-btn" data-type="sqli">💉 SQL Injection</button>
+                    <button class="sim-btn" data-type="xss">📜 Cross-Site Scripting</button>
+                    <button class="sim-btn" data-type="traversal">📂 Path Traversal</button>
+                    <button class="sim-btn" data-type="rce">💻 Remote Code Execution</button>
+                    <button class="sim-btn btn-success" data-type="normal">✅ Normal Traffic</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="toast-area"></div>
-    <script src="app.js?v=3.0.0"></script>
+    <script src="app.js?v=3.1.0"></script>
 </body>
 
 </html>

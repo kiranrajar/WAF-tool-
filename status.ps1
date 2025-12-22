@@ -3,8 +3,9 @@ Write-Host "══════════════════════�
 
 Write-Host "✅ CURRENT STATUS" -ForegroundColor Green
 Write-Host "  • WAF Engine: RUNNING on port 3000" -ForegroundColor White
-Write-Host "  • ML API: RUNNING on port 8000" -ForegroundColor White
-Write-Host "  • Dashboard: http://localhost:3000/`n" -ForegroundColor White
+Write-Host "  • Target App: RUNNING on port 5000" -ForegroundColor White
+Write-Host "  • ML API:     RUNNING on port 8000" -ForegroundColor White
+Write-Host "  • Dashboard:  http://localhost:3000/dashboard`n" -ForegroundColor White
 
 Write-Host "🛡️  ACTIVE FEATURES" -ForegroundColor Yellow
 Write-Host "  ✓ ML-Based Anomaly Detection" -ForegroundColor Green

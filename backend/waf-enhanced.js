@@ -1,4 +1,3 @@
-require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
@@ -6,81 +5,119 @@ const fs = require('fs');
 const path = require('path');
 const bodyParser = require('body-parser');
 const geoip = require('geoip-lite');
-const UAParser = require('ua-parser-js');
+const useragent = require('express-useragent');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const mongoose = require('mongoose');
+const rateLimit = require('express-rate-limit');
 const { Log, Blacklist, Reputation } = require('./models');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const TARGET_URL = process.env.TARGET_URL || 'https://httpbin.org';
+const TARGET_URL = process.env.TARGET_URL || 'http://localhost:5000'; // Default to our target app
 const MONGODB_URI = process.env.MONGODB_URI;
-const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK; // Optional for alerts
+const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK;
 
-// Connect to MongoDB if URI is provided
+// Connect to MongoDB
 if (MONGODB_URI) {
     mongoose.connect(MONGODB_URI)
         .then(() => console.log('✅ Connected to MongoDB Atlas'))
         .catch(err => console.error('❌ MongoDB Connection Error:', err));
-} else {
-    console.warn('⚠️  MONGODB_URI not found. Using local JSON files (data will not persist on Vercel).');
 }
+
 const LOG_FILE = path.join(__dirname, 'logs.json');
 const BLACKLIST_FILE = path.join(__dirname, 'blacklist.json');
-const REPUTATION_FILE = path.join(__dirname, 'reputation.json');
+const CONFIG_FILE = path.join(__dirname, 'config.json');
 
-// Initialize files
+// Initialize files if not exists
 if (!fs.existsSync(LOG_FILE)) fs.writeFileSync(LOG_FILE, JSON.stringify([]));
 if (!fs.existsSync(BLACKLIST_FILE)) fs.writeFileSync(BLACKLIST_FILE, JSON.stringify([]));
-if (!fs.existsSync(REPUTATION_FILE)) fs.writeFileSync(REPUTATION_FILE, JSON.stringify({}));
+if (!fs.existsSync(CONFIG_FILE)) {
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify({
+        blockedCountries: ['CN', 'RU', 'KP'],
+        rateLimit: 100,
+        riskThreshold: 0.88,
+        protectionMode: 'blocking' // 'learning' or 'blocking'
+    }));
+}
 
 app.use(cors());
+app.use(useragent.express());
 app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
-// Disable caching for all static files
-app.use((req, res, next) => {
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.setHeader('Surrogate-Control', 'no-store');
-    next();
+// Rate Limiting (DDoS Protection)
+const limiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: (req) => {
+        const config = JSON.parse(fs.readFileSync(CONFIG_FILE));
+        return config.rateLimit || 100;
+    },
+    message: { error: "Too many requests. AEGIS DDoS Protection active." },
+    standardHeaders: true,
+    legacyHeaders: false,
 });
 
-// Serve static files BEFORE WAF middleware
-app.use(express.static(path.join(__dirname, '../dashboard')));
+// Serve static files (Dashboard)
+app.use('/dashboard', express.static(path.join(__dirname, '../dashboard')));
+
+// Custom Block Page Helper
+function getBlockPage(ip, reason, incidentId) {
+    return `
+        <html>
+        <head>
+            <title>403 Forbidden - AEGIS Shield</title>
+            <style>
+                body { background: #0d1117; color: #c9d1d9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+                .container { background: #161b22; border: 1px solid #30363d; padding: 40px; border-radius: 12px; max-width: 600px; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+                .icon { font-size: 64px; color: #f85149; margin-bottom: 20px; }
+                h1 { font-size: 24px; color: #f85149; margin-bottom: 10px; }
+                p { line-height: 1.6; color: #8b949e; }
+                .meta { margin-top: 30px; font-family: monospace; font-size: 12px; color: #484f58; background: #0d1117; padding: 15px; border-radius: 6px; text-align: left; }
+                .footer { margin-top: 40px; font-size: 14px; color: #58a6ff; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="icon">🛡️</div>
+                <h1>Access Denied by AEGIS Shield</h1>
+                <p>Your request was flagged as a potential security threat and has been blocked by our automated systems.</p>
+                <div class="meta">
+                    [SYSTEM_LOG]<br>
+                    IP: ${ip}<br>
+                    CAUSE: ${reason}<br>
+                    INCIDENT_ID: ${incidentId}<br>
+                    TIME: ${new Date().toISOString()}
+                </div>
+                <div class="footer">Protected by AEGIS Shield Enterprise Security</div>
+            </div>
+        </body>
+        </html>
+    `;
+}
 
 // Attack signatures
 const SIGNATURES = {
-    'SQL Injection': [
-        /UNION\s+SELECT/i, /OR\s+1=1/i, /admin'--/i, /DROP\s+TABLE/i,
-        /SLEEP\(\d+\)/i, /BENCHMARK\(/i, /information_schema/i
-    ],
-    'XSS': [
-        /<script.*?>/i, /javascript:/i, /onerror=/i, /onload=/i,
-        /eval\(/i, /alert\(/i, /document\.cookie/i
-    ],
-    'Path Traversal': [
-        /\.\.\//, /%2e%2e%2f/i, /\/etc\/passwd/i, /\/windows\/system32/i, /boot\.ini/i
-    ],
-    'WebShell/RCE': [
-        /cmd\.exe/i, /bin\/sh/i, /bin\/bash/i, /passthru\(/i, /exec\(/i, /system\(/i, /shell_exec\(/i
-    ]
+    'SQL Injection': [/UNION\s+SELECT/i, /OR\s+1=1/i, /admin'--/i, /DROP\s+TABLE/i, /SLEEP\(\d+\)/i, /BENCHMARK\(/i, /information_schema/i],
+    'XSS': [/<script.*?>/i, /javascript:/i, /onerror=/i, /onload=/i, /eval\(/i, /alert\(/i, /document\.cookie/i],
+    'Path Traversal': [/\.\.\//, /%2e%2e%2f/i, /\/etc\/passwd/i, /\/windows\/system32/i, /boot\.ini/i],
+    'WebShell/RCE': [/cmd\.exe/i, /bin\/sh/i, /bin\/bash/i, /passthru\(/i, /exec\(/i, /system\(/i, /shell_exec\(/i]
 };
 
 function calculateEntropy(text) {
     if (!text) return 0;
     const len = text.length;
     const freq = {};
-    for (let char of text) freq[char] = (freq[char] || 0) + 1;
+    for (const char of text) freq[char] = (freq[char] || 0) + 1;
     let entropy = 0;
-    for (let char in freq) {
+    for (const char in freq) {
         const p = freq[char] / len;
         entropy -= p * Math.log2(p);
     }
     return entropy;
 }
 
-function extractFeatures(payload) {
+function extractFeatures(req) {
+    const payload = req.url + JSON.stringify(req.body || "") + JSON.stringify(req.query || "");
     const decoded = decodeURIComponent(payload);
     const length = decoded.length;
     const specCount = (decoded.match(/[',<>"();[\]{}!@#$%^&*+-=/\\|_]/g) || []).length;
@@ -98,58 +135,13 @@ function extractFeatures(payload) {
     return [length, specDensity, sqli + trauma, xss + rce, encodedChars, entropy];
 }
 
-function detectBot(req) {
-    const userAgent = req.get('user-agent') || 'Unknown';
-    const botPatterns = [/bot/i, /crawler/i, /spider/i, /scraper/i, /curl/i, /wget/i, /headless/i];
-    const isBasicBot = botPatterns.some(pattern => pattern.test(userAgent));
-
-    // Passive Fingerprinting (Advanced Bot Shield)
-    const hasHeadlessHeaders = !req.get('accept-language') || !req.get('accept');
-    const isAutomationTool = req.get('x-puppeteer-version') || req.get('webdriver');
-
-    return {
-        isBot: isBasicBot || hasHeadlessHeaders || isAutomationTool,
-        type: isBasicBot ? "Known Bot" : (hasHeadlessHeaders ? "Headless Browser" : "Automation Tool")
-    };
-}
-
-async function sendAlert(attackData) {
-    if (!DISCORD_WEBHOOK) return;
-    try {
-        await axios.post(DISCORD_WEBHOOK, {
-            embeds: [{
-                title: "🚨 High-Risk Security Event Blocked",
-                color: 0xef4444,
-                fields: [
-                    { name: "Threat Type", value: attackData.type, inline: true },
-                    { name: "Risk Score", value: `${(attackData.risk * 100).toFixed(1)}%`, inline: true },
-                    { name: "IP Address", value: attackData.ip, inline: true },
-                    { name: "Country", value: attackData.country, inline: true },
-                    { name: "Payload", value: `\`${attackData.url.substring(0, 100)}\`` }
-                ],
-                footer: { text: "AEGIS Shield Sentinel System" },
-                timestamp: new Date().toISOString()
-            }]
-        });
-    } catch (err) {
-        console.error('Failed to send alert:', err.message);
-    }
-}
-
 async function logRequest(logData) {
     try {
         if (MONGODB_URI) {
-            await Log.create({
-                time: new Date().toLocaleTimeString(),
-                ...logData
-            });
+            await Log.create({ time: new Date().toLocaleTimeString(), ...logData });
         } else {
             const logs = JSON.parse(fs.readFileSync(LOG_FILE));
-            logs.push({
-                time: new Date().toLocaleTimeString(),
-                timestamp: Date.now(),
-                ...logData
-            });
+            logs.push({ time: new Date().toLocaleTimeString(), timestamp: Date.now(), ...logData });
             if (logs.length > 500) logs.shift();
             fs.writeFileSync(LOG_FILE, JSON.stringify(logs, null, 2));
         }
@@ -158,302 +150,158 @@ async function logRequest(logData) {
     }
 }
 
-async function getReputation(ip) {
-    try {
-        if (MONGODB_URI) {
-            const rep = await Reputation.findOne({ ip });
-            return rep || { score: 0, attacks: 0 };
-        } else {
-            const reps = JSON.parse(fs.readFileSync(REPUTATION_FILE));
-            return reps[ip] || { score: 0, attacks: 0 };
-        }
-    } catch {
-        return { score: 0, attacks: 0 };
-    }
-}
-
-async function updateReputation(ip, change) {
-    try {
-        if (MONGODB_URI) {
-            return await Reputation.findOneAndUpdate(
-                { ip },
-                {
-                    $inc: { score: change, attacks: (change < 0 ? 1 : 0) },
-                    $set: { lastUpdate: Date.now() }
-                },
-                { upsert: true, new: true }
-            );
-        } else {
-            const reps = JSON.parse(fs.readFileSync(REPUTATION_FILE));
-            if (!reps[ip]) reps[ip] = { score: 0, attacks: 0 };
-            reps[ip].score += change;
-            reps[ip].attacks += (change < 0 ? 1 : 0);
-            reps[ip].lastUpdate = Date.now();
-            fs.writeFileSync(REPUTATION_FILE, JSON.stringify(reps, null, 2));
-            return reps[ip];
-        }
-    } catch (err) {
-        console.error('Error updating reputation:', err);
-        return { score: 0, attacks: 0 };
-    }
-}
-
-async function addToBlacklist(ip, reason) {
-    try {
-        if (MONGODB_URI) {
-            await Blacklist.findOneAndUpdate(
-                { ip },
-                { reason, added: new Date() },
-                { upsert: true }
-            );
-        } else {
-            const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
-            if (!blacklist.find(b => b.ip === ip)) {
-                blacklist.push({ ip, reason, added: new Date().toISOString() });
-                fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(blacklist, null, 2));
-            }
-        }
-        console.log(`🚫 IP ${ip} blacklisted: ${reason}`);
-    } catch (err) {
-        console.error('Error adding to blacklist:', err);
-    }
-}
-
-// WAF Middleware - ONLY for non-static routes
+// Core WAF Logic
 app.use(async (req, res, next) => {
-    const startTime = Date.now();
-    const ip = req.ip.replace('::ffff:', '');
-    const userAgent = req.get('user-agent') || 'Unknown';
-
-    // Skip API routes only (static files already served above)
-    if (req.url.startsWith('/api/') || req.url === '/health') {
+    // Skip WAF for internal APIs and Dashboard
+    if (req.url.startsWith('/api/') || req.url.startsWith('/dashboard') || req.url === '/health') {
         return next();
     }
 
+    const startTime = Date.now();
+    const ip = req.ip.replace('::ffff:', '');
+    const config = JSON.parse(fs.readFileSync(CONFIG_FILE));
+
     try {
-        // GeoIP
         const geo = geoip.lookup(ip);
         const country = geo ? geo.country : 'XX';
 
-        // Advanced Bot Shield
-        const botData = detectBot(req);
-        const uaParser = new UAParser(userAgent);
-
-        // Blacklist check
-        if (MONGODB_URI) {
-            const isBlacklisted = await Blacklist.findOne({ ip });
-            if (isBlacklisted) {
-                console.log(`🚫 Blocked blacklisted IP: ${ip}`);
-                return res.status(403).json({ error: 'Access Denied' });
-            }
-        } else {
-            const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
-            if (blacklist.some(b => b.ip === ip)) {
-                console.log(`🚫 Blocked blacklisted IP: ${ip}`);
-                return res.status(403).json({ error: 'Access Denied' });
-            }
+        // 1. Geo-Blocking
+        if (config.blockedCountries.includes(country)) {
+            console.log(`🚫 Geo-Blocked: ${ip} from ${country}`);
+            return res.status(403).send(getBlockPage(ip, "Geo-Location Blocked", "GEO-" + country));
         }
 
-        // Reputation check
-        const reputation = await getReputation(ip);
-        if (reputation.score < -50) {
-            console.log(`🚫 Blocked low reputation IP: ${ip} (score: ${reputation.score})`);
-            return res.status(403).json({ error: 'Access denied due to reputation' });
+        // 2. Blacklist Check
+        const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
+        if (blacklist.some(b => b.ip === ip)) {
+            return res.status(403).send(getBlockPage(ip, "IP Permanently Blacklisted", "B-LIST"));
         }
 
-        const payload = req.url + JSON.stringify(req.body || "");
-        const features = extractFeatures(payload);
+        // 3. Rate Limiting check is handled by middleware but we can add manual logic if needed.
 
+        // 4. ML & Signature Inspection
+        const features = extractFeatures(req);
         let risk = 0.5;
-        let status = "Allowed";
         let type = "Normal";
 
-        // ML Detection
+        // Try ML Engine
         try {
-            const mlRes = await axios.post("http://localhost:8000/score", { features }, { timeout: 5000 });
+            const mlRes = await axios.post("http://localhost:8000/score", { features }, { timeout: 2000 });
             risk = mlRes.data.risk;
         } catch (err) {
-            console.warn('⚠️  ML API unavailable, using rules only');
+            // Fallback to heuristic
+            risk = (features[1] * 2 + (features[2] + features[3]) * 0.5 + features[5] * 0.1) / 3;
         }
 
-        // Signature detection
-        const detectedType = Object.keys(SIGNATURES).find(category =>
-            SIGNATURES[category].some(pattern => pattern.test(decodeURIComponent(payload)))
+        // Signature check
+        const payload = req.url + JSON.stringify(req.body);
+        const detectedType = Object.keys(SIGNATURES).find(cat =>
+            SIGNATURES[cat].some(p => p.test(decodeURIComponent(payload)))
         );
 
-        if (detectedType) {
-            type = detectedType;
-        } else if (risk > 0.7) {
-            type = "Anomaly / Threat";
-        }
+        if (detectedType) type = detectedType;
+        else if (risk > 0.7) type = "Anomaly Detected";
 
-        // Decision
-        if (risk > 0.88 || detectedType) {
+        let status = "Allowed";
+        if ((risk > config.riskThreshold || detectedType) && config.protectionMode === 'blocking') {
             status = "Blocked";
-            const updatedRep = await updateReputation(ip, -20);
-
-            console.log(`🚨 ATTACK DETECTED: ${type} from ${ip} (risk: ${(risk * 100).toFixed(1)}%)`);
-
-            // Master Phase: Real-Time Alerts
-            if (risk > 0.92 || detectedType) {
-                sendAlert({ ip, country, type, risk, url: req.url });
-            }
-
-            if (updatedRep.score < -50) {
-                await addToBlacklist(ip, `Auto-blocked: ${type} (${updatedRep.attacks} attacks)`);
-            }
+            console.log(`🚨 ATTACK DETECTED: ${type} from ${ip} (Risk: ${risk.toFixed(3)})`);
         }
 
-        // Log
+        // Log results
         logRequest({
-            ip,
-            country,
-            url: req.url,
-            method: req.method,
-            userAgent: browser.name || userAgent.substring(0, 50),
-            risk: parseFloat(risk.toFixed(3)),
-            status,
-            type,
+            ip, country, url: req.url, method: req.method,
+            userAgent: req.useragent.browser || 'Unknown',
+            risk: parseFloat(risk.toFixed(3)), status, type,
             responseTime: Date.now() - startTime,
-            isBot: botData.isBot,
-            botInfo: botData.type
+            isBot: req.useragent.isBot
         });
 
         if (status === "Blocked") {
-            return res.status(403).json({
-                error: "🛡️ Blocked by AEGIS Shield",
-                risk_score: risk.toFixed(3),
-                threat_type: type,
-                incident_id: Math.random().toString(36).substring(7).toUpperCase()
-            });
-        }
-
-        // IMPORTANT: Move to proxy only if not a dashboard/API route
-        if (req.url.startsWith('/api/') || req.url === '/health' || req.headers.referer?.includes('/dashboard')) {
-            return next();
+            const incidentId = Math.random().toString(36).substring(7).toUpperCase();
+            return res.status(403).send(getBlockPage(ip, type, incidentId));
         }
 
         next();
     } catch (err) {
-        console.error('WAF error:', err);
+        console.error('WAF Process Error:', err);
         next();
     }
 });
 
-// Reverse Proxy Implementation
-app.use('/', (req, res, next) => {
-    // Skip proxy for Dashboard and Internal APIs
-    if (req.url.startsWith('/api/') || req.url === '/health' || req.url.includes('style.css') || req.url.includes('app.js')) {
+// Primary Reverse Proxy
+app.use('/', limiter, (req, res, next) => {
+    // Skip if internal
+    if (req.url.startsWith('/api/') || req.url.startsWith('/dashboard') || req.url === '/health') {
         return next();
     }
 
     createProxyMiddleware({
         target: TARGET_URL,
         changeOrigin: true,
+        onError: (err, req, res) => {
+            res.status(502).send('<h1>502 Bad Gateway</h1><p>AEGIS Shield: Could not reach target application.</p>');
+        },
         onProxyReq: (proxyReq, req, res) => {
-            // Forward headers correctly
-            proxyReq.setHeader('X-Protected-By', 'AEGIS-Shield-WAF');
+            proxyReq.setHeader('X-Protected-By', 'AEGIS-Shield-v3');
+            proxyReq.setHeader('X-Real-IP', req.ip);
         }
     })(req, res, next);
 });
 
-// API Endpoints
-app.get('/api/logs', async (req, res) => {
-    try {
-        if (MONGODB_URI) {
-            const logs = await Log.find().sort({ timestamp: -1 }).limit(100);
-            res.json(logs);
-        } else {
-            const logs = JSON.parse(fs.readFileSync(LOG_FILE));
-            res.json(logs.reverse());
-        }
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to fetch logs' });
-    }
-});
+// Admin API
+app.get('/api/stats', (req, res) => {
+    const logs = JSON.parse(fs.readFileSync(LOG_FILE));
+    const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
+    const config = JSON.parse(fs.readFileSync(CONFIG_FILE));
 
-app.get('/api/stats', async (req, res) => {
-    try {
-        if (MONGODB_URI) {
-            const total = await Log.countDocuments();
-            const blocked = await Log.countDocuments({ status: 'Blocked' });
-            const blacklistCount = await Blacklist.countDocuments();
-            const lastLogs = await Log.find().limit(100);
-            const avgRisk = lastLogs.length > 0 ? lastLogs.reduce((acc, l) => acc + l.risk, 0) / lastLogs.length : 0;
+    const blocked = logs.filter(l => l.status === "Blocked").length;
+    const threats = logs.reduce((acc, l) => {
+        if (l.type !== "Normal") acc[l.type] = (acc[l.type] || 0) + 1;
+        return acc;
+    }, {});
 
-            // Threat type distribution
-            const threats = {};
-            lastLogs.forEach(l => {
-                if (l.type !== "Normal") threats[l.type] = (threats[l.type] || 0) + 1;
-            });
-
-            res.json({ total, blocked, allowed: total - blocked, avgRisk, threats, blacklistCount });
-        } else {
-            // Existing local logic
-            const logs = JSON.parse(fs.readFileSync(LOG_FILE));
-            const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
-            res.json({
-                total: logs.length,
-                blocked: logs.filter(l => l.status === "Blocked").length,
-                allowed: logs.filter(l => l.status === "Allowed").length,
-                avgRisk: logs.length > 0 ? logs.reduce((acc, l) => acc + l.risk, 0) / logs.length : 0,
-                threats: logs.reduce((acc, l) => {
-                    if (l.type !== "Normal") acc[l.type] = (acc[l.type] || 0) + 1;
-                    return acc;
-                }, {}),
-                blacklistCount: blacklist.length
-            });
-        }
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to fetch stats' });
-    }
-});
-
-app.get('/api/config', async (req, res) => {
-    if (MONGODB_URI) {
-        const blacklist = await Blacklist.find();
-        res.json({ blacklist: blacklist.map(b => b.ip) });
-    } else {
-        const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
-        res.json({ blacklist: blacklist.map(b => b.ip) });
-    }
-});
-
-app.post('/api/unblock', async (req, res) => {
-    const { ip } = req.body;
-    if (MONGODB_URI) {
-        await Blacklist.deleteOne({ ip });
-    } else {
-        const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
-        const filtered = blacklist.filter(b => b.ip !== ip);
-        fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(filtered, null, 2));
-    }
-    console.log(`✓ IP ${ip} removed from blacklist`);
-    res.json({ success: true });
-});
-
-app.get('/health', (req, res) => {
     res.json({
-        status: 'healthy',
-        version: '3.0.0',
-        uptime: process.uptime(),
-        timestamp: new Date().toISOString()
+        total: logs.length,
+        blocked,
+        allowed: logs.length - blocked,
+        avgRisk: logs.length > 0 ? logs.reduce((acc, l) => acc + l.risk, 0) / logs.length : 0,
+        threats,
+        blacklistCount: blacklist.length,
+        config
     });
 });
 
-app.listen(PORT, () => {
-    console.log('\n🛡️  ═══════════════════════════════════════════════════════');
-    console.log('   AEGIS Shield v3.0 - Production WAF');
-    console.log('   ═══════════════════════════════════════════════════════');
-    console.log(`   🌐 Dashboard:  http://localhost:${PORT}/`);
-    console.log(`   📊 API Stats:  http://localhost:${PORT}/api/stats`);
-    console.log(`   🏥 Health:     http://localhost:${PORT}/health`);
-    console.log('   ═══════════════════════════════════════════════════════');
-    console.log('   ✓ GeoIP Detection: Enabled');
-    console.log('   ✓ Bot Detection: Enabled');
-    console.log('   ✓ ML Engine: Ready');
-    console.log('   ✓ Reputation System: Active');
-    console.log('   ═══════════════════════════════════════════════════════\n');
+app.get('/api/logs', (req, res) => {
+    const logs = JSON.parse(fs.readFileSync(LOG_FILE));
+    res.json(logs.reverse().slice(0, 100));
 });
 
-module.exports = app;
+app.get('/api/config', (req, res) => {
+    const config = JSON.parse(fs.readFileSync(CONFIG_FILE));
+    const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
+    res.json({ ...config, blacklist: blacklist.map(b => b.ip) });
+});
+
+app.post('/api/config', (req, res) => {
+    const newConfig = req.body;
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(newConfig, null, 2));
+    res.json({ success: true });
+});
+
+app.post('/api/unblock', (req, res) => {
+    const { ip } = req.body;
+    const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
+    const filtered = blacklist.filter(b => b.ip !== ip);
+    fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(filtered, null, 2));
+    res.json({ success: true });
+});
+
+app.get('/health', (req, res) => res.json({ status: 'active', version: '3.1.0-PROD' }));
+
+app.listen(PORT, () => {
+    console.log(`\n🛡️  AEGIS SHIELD v3.1 PROFESSIONAL WAF STARTED`);
+    console.log(`🌐 Proxy Listening:    http://localhost:${PORT}`);
+    console.log(`📊 Security Dashboard: http://localhost:${PORT}/dashboard`);
+    console.log(`🎯 Target Application: ${TARGET_URL}\n`);
+});
