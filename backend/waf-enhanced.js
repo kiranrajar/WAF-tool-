@@ -83,26 +83,6 @@ const limiter = rateLimit({
     legacyHeaders: false,
 });
 
-// Honeypot Routes (Invisible Traps)
-app.get(['/.env', '/admin_setup', '/wp-admin', '/phpmyadmin', '/backup.zip'], (req, res) => {
-    const ip = req.ip.replace('::ffff:', '');
-    console.log(`🪤 Honeypot Triggered! IP: ${ip} touched ${req.url}`);
-
-    // Immediate Permanent Blacklist
-    const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
-    if (!blacklist.find(b => b.ip === ip)) {
-        blacklist.push({ ip, reason: `WAF Honeypot: ${req.url}`, timestamp: Date.now() });
-        fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(blacklist, null, 2));
-    }
-
-    sendSOCAlert({
-        type: "Honeypot Triggered (Auto-Blacklisted)",
-        ip, country: "XX", risk: 1.0, payload: `Accessed sensitive path: ${req.url}`
-    });
-
-    return res.status(403).send(getBlockPage(ip, "WAF Honeypot Activated", "HONEY-TRAP"));
-});
-
 // Serve static files (Dashboard)
 app.use('/dashboard', express.static(path.join(__dirname, '../dashboard')));
 
@@ -214,34 +194,51 @@ async function logRequest(logData) {
     }
 }
 
-// Core WAF Logic
+// Core WAF Engine (Global Inspection)
 app.use(async (req, res, next) => {
-    // Skip WAF for internal APIs and Dashboard
+    // 1. Basic Setup
+    const startTime = Date.now();
+    const ip = req.ip.replace('::ffff:', '').replace('127.0.0.1', '8.8.8.8'); // Local dev override for GeoIP
+    const config = JSON.parse(fs.readFileSync(CONFIG_FILE));
+    const geo = geoip.lookup(ip);
+    const country = geo ? geo.country : 'XX';
+
+    // 2. Internal Route Check
     if (req.url.startsWith('/api/') || req.url.startsWith('/dashboard') || req.url === '/health') {
         return next();
     }
 
-    const startTime = Date.now();
-    const ip = req.ip.replace('::ffff:', '');
-    const config = JSON.parse(fs.readFileSync(CONFIG_FILE));
+    // 3. Honeypot Check (Apex Mastery Traps)
+    const honeyPaths = ['/.env', '/admin_setup', '/wp-admin', '/phpmyadmin', '/backup.zip'];
+    if (honeyPaths.some(p => req.url.includes(p))) {
+        console.log(`🪤 Honeypot Triggered! IP: ${ip} touched ${req.url}`);
 
-    try {
-        const geo = geoip.lookup(ip);
-        const country = geo ? geo.country : 'XX';
-
-        // 1. Geo-Blocking
-        if (config.blockedCountries.includes(country)) {
-            console.log(`🚫 Geo-Blocked: ${ip} from ${country}`);
-            return res.status(403).send(getBlockPage(ip, "Geo-Location Blocked", "GEO-" + country));
+        const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
+        if (!blacklist.find(b => b.ip === ip)) {
+            blacklist.push({ ip, reason: `WAF Honeypot: ${req.url}`, timestamp: Date.now() });
+            fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(blacklist, null, 2));
         }
 
-        // 2. Blacklist Check
+        sendSOCAlert({
+            type: "Honeypot Triggered (Auto-Blacklisted)",
+            ip, country, risk: 1.0, payload: `Accessed sensitive path: ${req.url}`
+        });
+
+        return res.status(403).send(getBlockPage(ip, "WAF Honeypot Activated", "HONEY-TRAP"));
+    }
+
+    try {
+        // 4. Global Blacklist Check
         const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
         if (blacklist.some(b => b.ip === ip)) {
             return res.status(403).send(getBlockPage(ip, "IP Permanently Blacklisted", "B-LIST"));
         }
 
-        // 3. Rate Limiting check is handled by middleware but we can add manual logic if needed.
+        // 5. Geo-Blocking
+        if (config.blockedCountries.includes(country)) {
+            console.log(`🚫 Geo-Blocked: ${ip} from ${country}`);
+            return res.status(403).send(getBlockPage(ip, "Geo-Location Blocked", "GEO-" + country));
+        }
 
         // 4. ML & Signature Inspection & Fingerprinting
         const features = extractFeatures(req);
