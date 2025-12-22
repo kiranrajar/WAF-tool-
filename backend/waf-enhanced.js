@@ -302,3 +302,5 @@ app.listen(PORT, () => {
     console.log('   ✓ Reputation System: Active');
     console.log('   ═══════════════════════════════════════════════════════\n');
 });
+
+module.exports = app;
