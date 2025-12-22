@@ -8,9 +8,15 @@ const COUNTRY_COORDS = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    initCharts();
+    try {
+        initCharts();
+    } catch (e) {
+        console.warn("Chart system standby: UI placeholders active.");
+    }
     syncData();
-    setInterval(syncData, 1500);
+    setInterval(() => {
+        syncData().catch(e => console.warn("Sync pulse retry..."));
+    }, 2000);
 
     // Navigation
     document.querySelectorAll('#sidebar-nav a').forEach(link => {
@@ -120,18 +126,27 @@ function updateUI(logs, stats) {
     const config = stats.config || {};
 
     // Stats Cards
-    document.getElementById('stat-total').innerText = stats.total;
-    document.getElementById('stat-blocked').innerText = stats.blocked;
-    document.getElementById('stat-risk').innerText = stats.avgRisk.toFixed(3);
-    document.getElementById('stat-bans').innerText = stats.blacklistCount;
+    const safeSetText = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.innerText = val;
+    };
+
+    safeSetText('stat-total', stats.total || 0);
+    safeSetText('stat-blocked', stats.blocked || 0);
+    safeSetText('stat-risk', (stats.avgRisk || 0).toFixed(3));
+    safeSetText('stat-bans', stats.blacklistCount || 0);
 
     // Config Fields
-    if (document.getElementById('cfg-rate-limit')) {
-        document.getElementById('cfg-target').value = config.targetUrl || 'http://localhost:5000';
-        document.getElementById('cfg-rate-limit').value = config.rateLimit;
-        document.getElementById('cfg-threshold').value = Math.round(config.riskThreshold * 100);
-        document.getElementById('cfg-geo').value = config.blockedCountries?.join(', ');
-        document.getElementById('protection-mode').value = config.protectionMode;
+    if (document.getElementById('save-config') && config) {
+        const setVal = (id, v) => {
+            const el = document.getElementById(id);
+            if (el) el.value = v || '';
+        };
+        setVal('cfg-target', config.targetUrl);
+        setVal('cfg-rate-limit', config.rateLimit);
+        setVal('cfg-threshold', Math.round((config.riskThreshold || 0.5) * 100));
+        setVal('cfg-geo', config.blockedCountries?.join(', '));
+        setVal('protection-mode', config.protectionMode);
     }
 
     // Table
@@ -238,79 +253,89 @@ function getFlag(country) {
 }
 
 function initCharts() {
-    const velocityCtx = document.getElementById('velocityChart').getContext('2d');
-    velocityChart = new Chart(velocityCtx, {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [{
-                label: 'Risk Score',
-                data: [],
-                borderColor: '#58a6ff',
-                backgroundColor: 'rgba(88, 166, 255, 0.1)',
-                borderWidth: 2,
-                pointRadius: 0,
-                tension: 0.4,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: { min: 0, max: 1, grid: { color: '#21262d' }, ticks: { color: '#8b949e' } },
-                x: { display: false }
+    const vEl = document.getElementById('velocityChart');
+    if (vEl) {
+        const velocityCtx = vEl.getContext('2d');
+        velocityChart = new Chart(velocityCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Risk Score',
+                    data: [],
+                    borderColor: '#58a6ff',
+                    backgroundColor: 'rgba(88, 166, 255, 0.1)',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.4,
+                    fill: true
+                }]
             },
-            plugins: { legend: { display: false } }
-        }
-    });
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { min: 0, max: 1, grid: { color: '#21262d' }, ticks: { color: '#8b949e' } },
+                    x: { display: false }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
 
-    const vectorCtx = document.getElementById('vectorChart').getContext('2d');
-    vectorChart = new Chart(vectorCtx, {
-        type: 'radar',
-        data: {
-            labels: ['SQLi', 'XSS', 'Traversal', 'WebShell', 'Anomaly'],
-            datasets: [{
-                data: [0, 0, 0, 0, 0],
-                backgroundColor: 'rgba(248, 81, 73, 0.2)',
-                borderColor: '#f85149',
-                pointBackgroundColor: '#f85149',
-                pointBorderColor: '#fff',
-                pointHoverBackgroundColor: '#fff',
-                pointHoverBorderColor: '#f85149'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                r: {
-                    angleLines: { color: '#30363d' },
-                    grid: { color: '#30363d' },
-                    pointLabels: { color: '#8b949e', font: { size: 11 } },
-                    ticks: { display: false }
+    const vecEl = document.getElementById('vectorChart');
+    if (vecEl) {
+        const vectorCtx = vecEl.getContext('2d');
+        vectorChart = new Chart(vectorCtx, {
+            type: 'radar',
+            data: {
+                labels: ['SQLi', 'XSS', 'Traversal', 'WebShell', 'Anomaly'],
+                datasets: [{
+                    data: [0, 0, 0, 0, 0],
+                    backgroundColor: 'rgba(248, 81, 73, 0.2)',
+                    borderColor: '#f85149',
+                    pointBackgroundColor: '#f85149',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: '#f85149'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    r: {
+                        angleLines: { color: '#30363d' },
+                        grid: { color: '#30363d' },
+                        pointLabels: { color: '#8b949e', font: { size: 11 } },
+                        ticks: { display: false }
+                    }
                 }
             }
-        }
-    });
+        });
+    }
 }
 
 function updateCharts(logs, stats) {
-    const recent = logs.slice(-30);
-    velocityChart.data.labels = recent.map(l => l.time);
-    velocityChart.data.datasets[0].data = recent.map(l => l.risk);
-    velocityChart.update('none');
+    if (velocityChart) {
+        const recent = logs.slice(-30);
+        velocityChart.data.labels = recent.map(l => l.time);
+        velocityChart.data.datasets[0].data = recent.map(l => l.risk);
+        velocityChart.update('none');
+    }
 
-    const threatProfile = [
-        stats.threats['SQL Injection'] || 0,
-        stats.threats['XSS'] || 0,
-        stats.threats['Path Traversal'] || 0,
-        stats.threats['WebShell/RCE'] || 0,
-        stats.threats['Anomaly / Threat'] || 0
-    ];
-    vectorChart.data.datasets[0].data = threatProfile;
-    vectorChart.update('none');
+    if (vectorChart) {
+        const threatProfile = [
+            stats.threats['SQL Injection'] || 0,
+            stats.threats['XSS'] || 0,
+            stats.threats['Path Traversal'] || 0,
+            stats.threats['WebShell/RCE'] || 0,
+            stats.threats['Anomaly / Threat'] || 0
+        ];
+        vectorChart.data.datasets[0].data = threatProfile;
+        vectorChart.update('none');
+    }
 }
 
 let lastLogCount = 0;
