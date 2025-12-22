@@ -198,7 +198,7 @@ async function logRequest(logData) {
 app.use(async (req, res, next) => {
     // 1. Basic Setup
     const startTime = Date.now();
-    const ip = req.ip.replace('::ffff:', '').replace('127.0.0.1', '8.8.8.8'); // Local dev override for GeoIP
+    const ip = req.ip.replace('::ffff:', '').replace('127.0.0.1', '8.8.8.8').replace('::1', '8.8.8.8'); // Local dev override for GeoIP
     const config = JSON.parse(fs.readFileSync(CONFIG_FILE));
     const geo = geoip.lookup(ip);
     const country = geo ? geo.country : 'XX';
@@ -357,42 +357,39 @@ app.use('/', limiter, (req, res, next) => {
 });
 
 // Admin API
-app.get('/api/stats', async (req, res) => {
-    let logs = [];
-    if (MONGODB_URI) {
-        logs = await Log.find().sort({ timestamp: -1 }).limit(500);
-    } else {
-        logs = JSON.parse(fs.readFileSync(LOG_FILE));
+app.get('/api/stats', (req, res) => {
+    try {
+        const logs = JSON.parse(fs.readFileSync(LOG_FILE, 'utf8'));
+        const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE, 'utf8'));
+        const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+
+        const blocked = logs.filter(l => l.status === "Blocked").length;
+        const threats = logs.reduce((acc, l) => {
+            if (l.type !== "Normal") acc[l.type] = (acc[l.type] || 0) + 1;
+            return acc;
+        }, {});
+
+        res.json({
+            total: logs.length,
+            blocked,
+            allowed: logs.length - blocked,
+            avgRisk: logs.length > 0 ? logs.reduce((acc, l) => acc + l.risk, 0) / logs.length : 0,
+            threats,
+            blacklistCount: blacklist.length,
+            config
+        });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to read data" });
     }
-    const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
-    const config = JSON.parse(fs.readFileSync(CONFIG_FILE));
-
-    const blocked = logs.filter(l => l.status === "Blocked").length;
-    const threats = logs.reduce((acc, l) => {
-        if (l.type !== "Normal") acc[l.type] = (acc[l.type] || 0) + 1;
-        return acc;
-    }, {});
-
-    res.json({
-        total: logs.length,
-        blocked,
-        allowed: logs.length - blocked,
-        avgRisk: logs.length > 0 ? logs.reduce((acc, l) => acc + l.risk, 0) / logs.length : 0,
-        threats,
-        blacklistCount: blacklist.length,
-        config
-    });
 });
 
-app.get('/api/logs', async (req, res) => {
-    let logs = [];
-    if (MONGODB_URI) {
-        logs = await Log.find().sort({ timestamp: -1 }).limit(100);
-    } else {
-        logs = JSON.parse(fs.readFileSync(LOG_FILE));
-        logs = logs.reverse().slice(0, 100);
+app.get('/api/logs', (req, res) => {
+    try {
+        const logs = JSON.parse(fs.readFileSync(LOG_FILE, 'utf8'));
+        res.json(logs.reverse().slice(0, 50));
+    } catch (err) {
+        res.json([]);
     }
-    res.json(logs);
 });
 
 app.get('/api/config', (req, res) => {

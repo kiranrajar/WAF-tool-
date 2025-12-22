@@ -1250,3 +1250,7 @@ tr:hover td {
     align-items: center;
     margin-bottom: 1.5rem;
 }
+/* Final Map Visibility Recovery */
+.map-container { background: #0b0e14 url('https://upload.wikimedia.org/wikipedia/commons/e/ec/World_map_blank_without_borders.svg') no-repeat center !important; background-size: contain !important; opacity: 0.2 !important; min-height: 350px; }
+.map-card { border: 1px solid var(--accent) !important; box-shadow: 0 0 20px rgba(0,255,255,0.1); }
+#stat-total, #stat-blocked, #map-critical { color: var(--accent) !important; text-shadow: 0 0 10px var(--accent); }

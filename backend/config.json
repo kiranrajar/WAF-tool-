@@ -1,8 +1,11 @@
 {
-  "rateLimit": 10,
-  "riskThreshold": 0,
+  "targetUrl": "http://localhost:5000",
+  "rateLimit": 100,
+  "riskThreshold": 0.5,
   "blockedCountries": [
-    ""
+    "CN",
+    "RU",
+    "KP"
   ],
-  "protectionMode": ""
+  "protectionMode": "blocking"
 }

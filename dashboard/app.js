@@ -107,10 +107,12 @@ async function syncData() {
         const stats = await statsRes.json();
         currentConfig = stats.config || {};
 
-        updateUI(logs, stats);
-        updateMap(logs);
+        if (stats.total !== undefined) {
+            updateUI(logs, stats);
+            updateMap(logs);
+        }
     } catch (err) {
-        console.error("Engine connectivity lost");
+        console.warn("Retrying engine sync...");
     }
 }
 
@@ -343,21 +345,20 @@ function updateMap(logs) {
     const mapContainer = document.getElementById('threat-map');
     if (!mapContainer) return;
 
-    // Update Map Statistics
+    // Pulse Map Stats
     if (document.getElementById('map-critical')) {
-        document.getElementById('map-critical').textContent = logs.filter(l => l.status === "Blocked" && l.risk > 0.9).length;
-        document.getElementById('map-anomalies').textContent = logs.filter(l => l.status === "Blocked" && l.risk <= 0.9).length;
+        document.getElementById('map-critical').innerText = logs.filter(l => l.status === "Blocked" && l.risk >= 0.8).length;
+        document.getElementById('map-anomalies').innerText = logs.filter(l => l.status === "Blocked" && l.risk < 0.8).length;
     }
 
-    // Only process recent blocks
     const now = Date.now();
-    const recentBlocks = logs.filter(l => l.status === "Blocked" && (now - l.timestamp < 10000));
+    const recentBlocks = logs.filter(l => l.status === "Blocked" && (now - l.timestamp < 15000));
 
     recentBlocks.forEach(log => {
         const id = `ping-${log.timestamp}`;
         if (document.getElementById(id)) return;
 
-        const pos = COUNTRY_COORDS[log.country] || COUNTRY_COORDS['XX'];
+        const pos = COUNTRY_COORDS[log.country] || COUNTRY_COORDS['US'];
         const ping = document.createElement('div');
         ping.className = 'attack-ping';
         ping.id = id;
@@ -365,6 +366,6 @@ function updateMap(logs) {
         ping.style.top = `${pos.y}%`;
 
         mapContainer.appendChild(ping);
-        setTimeout(() => ping.remove(), 2000);
+        setTimeout(() => ping.remove(), 2500);
     });
 }
