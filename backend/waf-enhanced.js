@@ -208,73 +208,75 @@ app.use(async (req, res, next) => {
         return next();
     }
 
-    // 3. Honeypot Check (Apex Mastery Traps)
-    const honeyPaths = ['/.env', '/admin_setup', '/wp-admin', '/phpmyadmin', '/backup.zip'];
-    if (honeyPaths.some(p => req.url.includes(p))) {
-        console.log(`🪤 Honeypot Triggered! IP: ${ip} touched ${req.url}`);
-
-        const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
-        if (!blacklist.find(b => b.ip === ip)) {
-            blacklist.push({ ip, reason: `WAF Honeypot: ${req.url}`, timestamp: Date.now() });
-            fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(blacklist, null, 2));
-        }
-
-        sendSOCAlert({
-            type: "Honeypot Triggered (Auto-Blacklisted)",
-            ip, country, risk: 1.0, payload: `Accessed sensitive path: ${req.url}`
-        });
-
-        return res.status(403).send(getBlockPage(ip, "WAF Honeypot Activated", "HONEY-TRAP"));
-    }
+    let status = "Allowed";
+    let type = "Normal";
+    let risk = 0.0;
 
     try {
+        // 3. Honeypot Check
+        const honeyPaths = ['/.env', '/admin_setup', '/wp-admin', '/phpmyadmin', '/backup.zip'];
+        if (status === "Allowed" && honeyPaths.some(p => req.url.includes(p))) {
+            status = "Blocked";
+            type = "WAF Honeypot Trap";
+            risk = 1.0;
+
+            const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
+            if (!blacklist.find(b => b.ip === ip)) {
+                blacklist.push({ ip, reason: `WAF Honeypot: ${req.url}`, timestamp: Date.now() });
+                fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(blacklist, null, 2));
+            }
+            sendSOCAlert({ type, ip, country, risk, payload: req.url });
+        }
+
         // 4. Global Blacklist Check
-        const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
-        if (blacklist.some(b => b.ip === ip)) {
-            return res.status(403).send(getBlockPage(ip, "IP Permanently Blacklisted", "B-LIST"));
+        if (status === "Allowed") {
+            const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
+            if (blacklist.some(b => b.ip === ip)) {
+                status = "Blocked";
+                type = "Blacklisted IP";
+                risk = 1.0;
+            }
         }
 
         // 5. Geo-Blocking
-        if (config.blockedCountries.includes(country)) {
-            console.log(`🚫 Geo-Blocked: ${ip} from ${country}`);
-            return res.status(403).send(getBlockPage(ip, "Geo-Location Blocked", "GEO-" + country));
-        }
-
-        // 4. ML & Signature Inspection & Fingerprinting
-        const features = extractFeatures(req);
-        const botRisk = getFingerprintRisk(req);
-        let risk = 0.5 + botRisk;
-        let type = botRisk > 0.4 ? "Automated Bot/Script" : "Normal";
-
-        // Try ML Engine
-        try {
-            const mlRes = await axios.post("http://localhost:8000/score", { features }, { timeout: 2000 });
-            risk = (mlRes.data.risk + botRisk) / 1.5; // Merge bot risk with ML anomaly score
-        } catch (err) {
-            // Fallback to heuristic
-            risk = (features[1] * 2 + (features[2] + features[3]) * 0.5 + features[5] * 0.1 + botRisk) / 3;
-        }
-
-        // Signature check
-        const payload = req.url + JSON.stringify(req.body);
-        const decodedPayload = decodeURIComponent(payload);
-        const detectedType = Object.keys(SIGNATURES).find(cat =>
-            SIGNATURES[cat].some(p => p.test(decodedPayload))
-        );
-
-        if (detectedType) {
-            type = detectedType;
+        if (status === "Allowed" && config.blockedCountries.includes(country)) {
+            status = "Blocked";
+            type = `Geo-Blocked (${country})`;
             risk = 1.0;
         }
 
-        let status = "Allowed";
-        if ((risk > config.riskThreshold || detectedType) && config.protectionMode === 'blocking') {
-            status = "Blocked";
-            sendSOCAlert({ type, ip, country, risk, payload: payload.substring(0, 100) });
-            console.log(`🚨 ATTACK DETECTED: ${type} from ${ip} (Risk: ${risk.toFixed(3)})`);
+        // 6. ML & Signature Inspection
+        if (status === "Allowed") {
+            const features = extractFeatures(req);
+            const botRisk = getFingerprintRisk(req);
+            risk = 0.5 + botRisk;
+            type = botRisk > 0.4 ? "Automated Bot/Script" : "Normal";
+
+            try {
+                const mlRes = await axios.post("http://localhost:8000/score", { features }, { timeout: 2000 });
+                risk = (mlRes.data.risk + botRisk) / 1.5;
+            } catch (err) {
+                risk = (features[1] * 2 + (features[2] + features[3]) * 0.5 + features[5] * 0.1 + botRisk) / 3;
+            }
+
+            const payload = req.url + JSON.stringify(req.body);
+            const decodedPayload = decodeURIComponent(payload);
+            const detectedType = Object.keys(SIGNATURES).find(cat =>
+                SIGNATURES[cat].some(p => p.test(decodedPayload))
+            );
+
+            if (detectedType) {
+                type = detectedType;
+                risk = 1.0;
+            }
+
+            if ((risk > config.riskThreshold || detectedType) && config.protectionMode === 'blocking') {
+                status = "Blocked";
+                sendSOCAlert({ type, ip, country, risk, payload: payload.substring(0, 100) });
+            }
         }
 
-        // Log results
+        // 7. Log results
         logRequest({
             ip, country, url: req.url, method: req.method,
             userAgent: req.useragent.browser || 'Unknown',
@@ -285,6 +287,7 @@ app.use(async (req, res, next) => {
 
         if (status === "Blocked") {
             const incidentId = Math.random().toString(36).substring(7).toUpperCase();
+            console.log(`🚨 BLOCKING: ${type} from ${ip} (Incident: ${incidentId})`);
             return res.status(403).send(getBlockPage(ip, type, incidentId));
         }
 
