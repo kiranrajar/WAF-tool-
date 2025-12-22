@@ -16,6 +16,7 @@
     "dotenv": "^16.6.1",
     "express": "^4.22.1",
     "geoip-lite": "^1.4.10",
+    "http-proxy-middleware": "^3.0.5",
     "node-cache": "^5.1.2",
     "ua-parser-js": "^1.0.41"
   },

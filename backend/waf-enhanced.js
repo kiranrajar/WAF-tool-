@@ -7,9 +7,11 @@ const path = require('path');
 const bodyParser = require('body-parser');
 const geoip = require('geoip-lite');
 const UAParser = require('ua-parser-js');
+const { createProxyMiddleware } = require('http-proxy-middleware');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const TARGET_URL = process.env.TARGET_URL || 'https://example.com'; // Change this to your real site
 const LOG_FILE = path.join(__dirname, 'logs.json');
 const BLACKLIST_FILE = path.join(__dirname, 'blacklist.json');
 const REPUTATION_FILE = path.join(__dirname, 'reputation.json');
@@ -231,8 +233,14 @@ app.use(async (req, res, next) => {
             return res.status(403).json({
                 error: "🛡️ Blocked by AEGIS Shield",
                 risk_score: risk.toFixed(3),
-                threat_type: type
+                threat_type: type,
+                incident_id: Math.random().toString(36).substring(7).toUpperCase()
             });
+        }
+
+        // IMPORTANT: Move to proxy only if not a dashboard/API route
+        if (req.url.startsWith('/api/') || req.url === '/health' || req.headers.referer?.includes('/dashboard')) {
+            return next();
         }
 
         next();
@@ -240,6 +248,23 @@ app.use(async (req, res, next) => {
         console.error('WAF error:', err);
         next();
     }
+});
+
+// Reverse Proxy Implementation
+app.use('/', (req, res, next) => {
+    // Skip proxy for Dashboard and Internal APIs
+    if (req.url.startsWith('/api/') || req.url === '/health' || req.url.includes('style.css') || req.url.includes('app.js')) {
+        return next();
+    }
+
+    createProxyMiddleware({
+        target: TARGET_URL,
+        changeOrigin: true,
+        onProxyReq: (proxyReq, req, res) => {
+            // Forward headers correctly
+            proxyReq.setHeader('X-Protected-By', 'AEGIS-Shield-WAF');
+        }
+    })(req, res, next);
 });
 
 // API Endpoints
