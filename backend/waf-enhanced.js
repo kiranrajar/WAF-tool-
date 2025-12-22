@@ -8,10 +8,22 @@ const bodyParser = require('body-parser');
 const geoip = require('geoip-lite');
 const UAParser = require('ua-parser-js');
 const { createProxyMiddleware } = require('http-proxy-middleware');
+const mongoose = require('mongoose');
+const { Log, Blacklist, Reputation } = require('./models');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const TARGET_URL = process.env.TARGET_URL || 'https://httpbin.org';
+const MONGODB_URI = process.env.MONGODB_URI;
+
+// Connect to MongoDB if URI is provided
+if (MONGODB_URI) {
+    mongoose.connect(MONGODB_URI)
+        .then(() => console.log('✅ Connected to MongoDB Atlas'))
+        .catch(err => console.error('❌ MongoDB Connection Error:', err));
+} else {
+    console.warn('⚠️  MONGODB_URI not found. Using local JSON files (data will not persist on Vercel).');
+}
 const LOG_FILE = path.join(__dirname, 'logs.json');
 const BLACKLIST_FILE = path.join(__dirname, 'blacklist.json');
 const REPUTATION_FILE = path.join(__dirname, 'reputation.json');
@@ -90,53 +102,84 @@ function detectBot(userAgent) {
     return botPatterns.some(pattern => pattern.test(userAgent));
 }
 
-function logRequest(logData) {
+async function logRequest(logData) {
     try {
-        const logs = JSON.parse(fs.readFileSync(LOG_FILE));
-        logs.push({
-            time: new Date().toLocaleTimeString(),
-            timestamp: Date.now(),
-            ...logData
-        });
-        if (logs.length > 500) logs.shift();
-        fs.writeFileSync(LOG_FILE, JSON.stringify(logs, null, 2));
+        if (MONGODB_URI) {
+            await Log.create({
+                time: new Date().toLocaleTimeString(),
+                ...logData
+            });
+        } else {
+            const logs = JSON.parse(fs.readFileSync(LOG_FILE));
+            logs.push({
+                time: new Date().toLocaleTimeString(),
+                timestamp: Date.now(),
+                ...logData
+            });
+            if (logs.length > 500) logs.shift();
+            fs.writeFileSync(LOG_FILE, JSON.stringify(logs, null, 2));
+        }
     } catch (err) {
         console.error('Error logging:', err);
     }
 }
 
-function getReputation(ip) {
+async function getReputation(ip) {
     try {
-        const reps = JSON.parse(fs.readFileSync(REPUTATION_FILE));
-        return reps[ip] || { score: 0, attacks: 0 };
+        if (MONGODB_URI) {
+            const rep = await Reputation.findOne({ ip });
+            return rep || { score: 0, attacks: 0 };
+        } else {
+            const reps = JSON.parse(fs.readFileSync(REPUTATION_FILE));
+            return reps[ip] || { score: 0, attacks: 0 };
+        }
     } catch {
         return { score: 0, attacks: 0 };
     }
 }
 
-function updateReputation(ip, change) {
+async function updateReputation(ip, change) {
     try {
-        const reps = JSON.parse(fs.readFileSync(REPUTATION_FILE));
-        if (!reps[ip]) reps[ip] = { score: 0, attacks: 0 };
-        reps[ip].score += change;
-        reps[ip].attacks += (change < 0 ? 1 : 0);
-        reps[ip].lastUpdate = Date.now();
-        fs.writeFileSync(REPUTATION_FILE, JSON.stringify(reps, null, 2));
-        return reps[ip];
+        if (MONGODB_URI) {
+            return await Reputation.findOneAndUpdate(
+                { ip },
+                {
+                    $inc: { score: change, attacks: (change < 0 ? 1 : 0) },
+                    $set: { lastUpdate: Date.now() }
+                },
+                { upsert: true, new: true }
+            );
+        } else {
+            const reps = JSON.parse(fs.readFileSync(REPUTATION_FILE));
+            if (!reps[ip]) reps[ip] = { score: 0, attacks: 0 };
+            reps[ip].score += change;
+            reps[ip].attacks += (change < 0 ? 1 : 0);
+            reps[ip].lastUpdate = Date.now();
+            fs.writeFileSync(REPUTATION_FILE, JSON.stringify(reps, null, 2));
+            return reps[ip];
+        }
     } catch (err) {
         console.error('Error updating reputation:', err);
         return { score: 0, attacks: 0 };
     }
 }
 
-function addToBlacklist(ip, reason) {
+async function addToBlacklist(ip, reason) {
     try {
-        const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
-        if (!blacklist.find(b => b.ip === ip)) {
-            blacklist.push({ ip, reason, added: new Date().toISOString() });
-            fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(blacklist, null, 2));
-            console.log(`🚫 IP ${ip} blacklisted: ${reason}`);
+        if (MONGODB_URI) {
+            await Blacklist.findOneAndUpdate(
+                { ip },
+                { reason, added: new Date() },
+                { upsert: true }
+            );
+        } else {
+            const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
+            if (!blacklist.find(b => b.ip === ip)) {
+                blacklist.push({ ip, reason, added: new Date().toISOString() });
+                fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(blacklist, null, 2));
+            }
         }
+        console.log(`🚫 IP ${ip} blacklisted: ${reason}`);
     } catch (err) {
         console.error('Error adding to blacklist:', err);
     }
@@ -164,14 +207,22 @@ app.use(async (req, res, next) => {
         const browser = uaParser.getBrowser();
 
         // Blacklist check
-        const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
-        if (blacklist.some(b => b.ip === ip)) {
-            console.log(`🚫 Blocked blacklisted IP: ${ip}`);
-            return res.status(403).json({ error: 'Access Denied' });
+        if (MONGODB_URI) {
+            const isBlacklisted = await Blacklist.findOne({ ip });
+            if (isBlacklisted) {
+                console.log(`🚫 Blocked blacklisted IP: ${ip}`);
+                return res.status(403).json({ error: 'Access Denied' });
+            }
+        } else {
+            const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
+            if (blacklist.some(b => b.ip === ip)) {
+                console.log(`🚫 Blocked blacklisted IP: ${ip}`);
+                return res.status(403).json({ error: 'Access Denied' });
+            }
         }
 
         // Reputation check
-        const reputation = getReputation(ip);
+        const reputation = await getReputation(ip);
         if (reputation.score < -50) {
             console.log(`🚫 Blocked low reputation IP: ${ip} (score: ${reputation.score})`);
             return res.status(403).json({ error: 'Access denied due to reputation' });
@@ -268,38 +319,76 @@ app.use('/', (req, res, next) => {
 });
 
 // API Endpoints
-app.get('/api/logs', (req, res) => {
-    const logs = JSON.parse(fs.readFileSync(LOG_FILE));
-    res.json(logs);
+app.get('/api/logs', async (req, res) => {
+    try {
+        if (MONGODB_URI) {
+            const logs = await Log.find().sort({ timestamp: -1 }).limit(100);
+            res.json(logs);
+        } else {
+            const logs = JSON.parse(fs.readFileSync(LOG_FILE));
+            res.json(logs.reverse());
+        }
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch logs' });
+    }
 });
 
-app.get('/api/stats', (req, res) => {
-    const logs = JSON.parse(fs.readFileSync(LOG_FILE));
-    const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
+app.get('/api/stats', async (req, res) => {
+    try {
+        if (MONGODB_URI) {
+            const total = await Log.countDocuments();
+            const blocked = await Log.countDocuments({ status: 'Blocked' });
+            const blacklistCount = await Blacklist.countDocuments();
+            const lastLogs = await Log.find().limit(100);
+            const avgRisk = lastLogs.length > 0 ? lastLogs.reduce((acc, l) => acc + l.risk, 0) / lastLogs.length : 0;
 
-    res.json({
-        total: logs.length,
-        blocked: logs.filter(l => l.status === "Blocked").length,
-        allowed: logs.filter(l => l.status === "Allowed").length,
-        avgRisk: logs.length > 0 ? logs.reduce((acc, l) => acc + l.risk, 0) / logs.length : 0,
-        threats: logs.reduce((acc, l) => {
-            if (l.type !== "Normal") acc[l.type] = (acc[l.type] || 0) + 1;
-            return acc;
-        }, {}),
-        blacklistCount: blacklist.length
-    });
+            // Threat type distribution
+            const threats = {};
+            lastLogs.forEach(l => {
+                if (l.type !== "Normal") threats[l.type] = (threats[l.type] || 0) + 1;
+            });
+
+            res.json({ total, blocked, allowed: total - blocked, avgRisk, threats, blacklistCount });
+        } else {
+            // Existing local logic
+            const logs = JSON.parse(fs.readFileSync(LOG_FILE));
+            const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
+            res.json({
+                total: logs.length,
+                blocked: logs.filter(l => l.status === "Blocked").length,
+                allowed: logs.filter(l => l.status === "Allowed").length,
+                avgRisk: logs.length > 0 ? logs.reduce((acc, l) => acc + l.risk, 0) / logs.length : 0,
+                threats: logs.reduce((acc, l) => {
+                    if (l.type !== "Normal") acc[l.type] = (acc[l.type] || 0) + 1;
+                    return acc;
+                }, {}),
+                blacklistCount: blacklist.length
+            });
+        }
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch stats' });
+    }
 });
 
-app.get('/api/config', (req, res) => {
-    const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
-    res.json({ blacklist: blacklist.map(b => b.ip) });
+app.get('/api/config', async (req, res) => {
+    if (MONGODB_URI) {
+        const blacklist = await Blacklist.find();
+        res.json({ blacklist: blacklist.map(b => b.ip) });
+    } else {
+        const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
+        res.json({ blacklist: blacklist.map(b => b.ip) });
+    }
 });
 
-app.post('/api/unblock', (req, res) => {
+app.post('/api/unblock', async (req, res) => {
     const { ip } = req.body;
-    const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
-    const filtered = blacklist.filter(b => b.ip !== ip);
-    fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(filtered, null, 2));
+    if (MONGODB_URI) {
+        await Blacklist.deleteOne({ ip });
+    } else {
+        const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
+        const filtered = blacklist.filter(b => b.ip !== ip);
+        fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(filtered, null, 2));
+    }
     console.log(`✓ IP ${ip} removed from blacklist`);
     res.json({ success: true });
 });

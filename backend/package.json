@@ -17,6 +17,7 @@
     "express": "^4.22.1",
     "geoip-lite": "^1.4.10",
     "http-proxy-middleware": "^3.0.5",
+    "mongoose": "^9.0.2",
     "node-cache": "^5.1.2",
     "ua-parser-js": "^1.0.41"
   },
