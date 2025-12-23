@@ -1,7 +1,8 @@
 {
     "version": 2,
-    "name": "aegis-shield-waf",
     "buildCommand": "cd backend && npm install",
+    "cleanUrls": true,
+    "trailingSlash": false,
     "rewrites": [
         {
             "source": "/api/:path*",
