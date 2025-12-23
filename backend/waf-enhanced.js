@@ -217,16 +217,25 @@ app.use(async (req, res, next) => {
 
     // 1. Basic Setup
     const startTime = Date.now();
-    const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || req.ip;
-    const cleanIp = ip.replace('::ffff:', '').replace('127.0.0.1', '8.8.8.8').replace('::1', '8.8.8.8');
+    // Vercel/Proxy IP Handling
+    const ip = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : (req.connection.remoteAddress || req.ip);
+    // If testing locally (::1), map to a random public IP for testing geo features, else keep it
+    const cleanIp = (ip === '::1' || ip === '127.0.0.1') ? '103.244.175.10' : ip.replace('::ffff:', ''); // 103... is a Pakistan IP example for testing
 
     let config = { blockedCountries: [], riskThreshold: 0.88, protectionMode: 'blocking' };
     try {
         if (fs.existsSync(CONFIG_FILE)) config = JSON.parse(fs.readFileSync(CONFIG_FILE));
     } catch (e) { }
 
-    const geo = geoip.lookup(cleanIp);
-    const country = geo ? geo.country : 'XX';
+    // Country Detection: Vercel Header -> GeoIP -> Default
+    let country = req.headers['x-vercel-ip-country'];
+    if (!country) {
+        const geo = geoip.lookup(cleanIp);
+        country = geo ? geo.country : 'US'; // Default to US if unknown
+    }
+
+    // Capture Payload for logging
+    const currentPayload = req.method + " " + req.url + (Object.keys(req.body || {}).length ? " " + JSON.stringify(req.body) : "");
 
     // 2. Internal Route Check
     if (req.url.startsWith('/api/') || req.url.startsWith('/dashboard') || req.url === '/health') {
@@ -309,14 +318,14 @@ app.use(async (req, res, next) => {
             }
         }
 
-        // 7. Log results
-        logRequest({
+        // 7. Log results (await to ensure persistence in serverless)
+        await logRequest({
             ip: cleanIp, country, url: req.url, method: req.method,
-            userAgent: req.useragent.browser || 'Unknown',
+            userAgent: req.headers['user-agent'] || 'Unknown',
             risk: parseFloat(risk.toFixed(3)), status, type,
             responseTime: Date.now() - startTime,
-            isBot: req.useragent.isBot,
-            payload: (req.method === 'POST' || req.method === 'PUT') ? JSON.stringify(req.body) : req.query && Object.keys(req.query).length ? JSON.stringify(req.query) : ''
+            isBot: req.isBot || false,
+            payload: currentPayload // Use the captured payload
         });
 
         if (status === "Blocked") {
