@@ -194,14 +194,14 @@ function getFingerprintRisk(req) {
 async function logRequest(logData) {
     try {
         if (MONGODB_URI) {
-            await Log.create({ time: new Date().toLocaleTimeString(), ...logData });
+            await Log.create({ time: new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Karachi' }), ...logData });
         } else {
             // Re-read file to ensure we have latest data (in case of concurrent lambdas, though loose consistency)
             let logs = [];
             if (fs.existsSync(LOG_FILE)) {
                 logs = JSON.parse(fs.readFileSync(LOG_FILE));
             }
-            logs.push({ time: new Date().toLocaleTimeString(), timestamp: Date.now(), ...logData });
+            logs.push({ time: new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Karachi' }), timestamp: Date.now(), ...logData });
             if (logs.length > 500) logs.shift();
             fs.writeFileSync(LOG_FILE, JSON.stringify(logs, null, 2));
         }
