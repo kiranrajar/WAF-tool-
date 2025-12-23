@@ -14,13 +14,10 @@
         {
             "source": "/health",
             "destination": "/api"
-        }
-    ],
-    "redirects": [
+        },
         {
             "source": "/",
-            "destination": "/dashboard",
-            "permanent": false
+            "destination": "/dashboard/index.html"
         }
     ],
     "headers": [
@@ -39,6 +36,5 @@
             "memory": 1024,
             "maxDuration": 10
         }
-    },
-    "public": true
+    }
 }
