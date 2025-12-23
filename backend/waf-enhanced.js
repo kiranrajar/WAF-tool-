@@ -102,23 +102,29 @@ app.use(useragent.express());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Rate Limiting (DDoS Protection)
 const limiter = rateLimit({
     windowMs: 1 * 60 * 1000, // 1 minute
     max: (req) => {
         try {
-            if (fs.existsSync(CONFIG_FILE)) {
-                const config = JSON.parse(fs.readFileSync(CONFIG_FILE));
-                return config.rateLimit || 100;
-            }
+            // Use currentConfig if available (synced by middleware), else try disk
+            const config = (typeof currentConfigGlobal !== 'undefined') ? currentConfigGlobal : DEFAULT_CONFIG;
+            return config.rateLimit || 100;
         } catch (e) { }
         return 100;
     },
     message: { error: "Too many requests. AEGIS DDoS Protection active." },
     standardHeaders: true,
     legacyHeaders: false,
-    skip: (req) => req.url.startsWith('/api/') || req.url.startsWith('/dashboard') || req.url === '/health'
+    skip: (req) => {
+        const isControlApi = ['/api/stats', '/api/config', '/api/logs', '/api/unblock', '/health'].some(p => req.url === p || req.url.startsWith(p + '?'));
+        const isDashboard = req.url.startsWith('/dashboard') || req.url === '/dashboard';
+        const isStatic = /\.(js|css|png|jpg|jpeg|gif|ico|svg)$/.test(req.url);
+        return isControlApi || isDashboard || isStatic;
+    }
 });
+
+let currentConfigGlobal = DEFAULT_CONFIG; // Cache for the limiter
+
 
 // Serve static files (Dashboard)
 app.use('/dashboard', express.static(path.join(__dirname, '../dashboard')));
@@ -241,10 +247,12 @@ async function logRequest(logData) {
 
 // Core WAF Engine (Global Inspection)
 app.use(async (req, res, next) => {
-    const internalPaths = ['/api/stats', '/api/logs', '/api/config', '/api/unblock', '/health'];
-    const isStatic = req.url.includes('.js') || req.url.includes('.css') || req.url.includes('.png') || req.url.includes('.jpg');
+    // 0. Skip WAF for exactly dashboard assets and internal control APIs
+    const isControlApi = ['/api/stats', '/api/config', '/api/logs', '/api/unblock', '/health'].some(p => req.url === p || req.url.startsWith(p + '?'));
+    const isDashboard = req.url.startsWith('/dashboard') || req.url === '/dashboard';
+    const isStatic = /\.(js|css|png|jpg|jpeg|gif|ico|svg)$/.test(req.url);
 
-    if (internalPaths.some(path => req.url.startsWith(path)) || req.url.startsWith('/dashboard') || isStatic) {
+    if (isControlApi || isDashboard || isStatic) {
         return next();
     }
 
@@ -254,19 +262,25 @@ app.use(async (req, res, next) => {
     // 1. Basic Setup
     const startTime = Date.now();
     // Vercel/Proxy IP Handling
-    const ip = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0] : (req.connection.remoteAddress || req.ip);
-    // If testing locally (::1), map to a random public IP for testing geo features, else keep it
-    const cleanIp = (ip === '::1' || ip === '127.0.0.1') ? '103.244.175.10' : ip.replace('::ffff:', ''); // 103... is a Pakistan IP example for testing
+    const xff = req.headers['x-forwarded-for'];
+    const ip = xff ? xff.split(',')[0].trim() : (req.connection.remoteAddress || req.ip);
 
+    // Load Config
     let config = DEFAULT_CONFIG;
     try {
-        if (MONGODB_URI) {
+        if (MONGODB_URI && mongoose.connection.readyState === 1) {
             const dbConfig = await Config.findOne({ id: 'global' }).lean();
             if (dbConfig) config = dbConfig;
         } else if (fs.existsSync(CONFIG_FILE)) {
             config = JSON.parse(fs.readFileSync(CONFIG_FILE));
         }
     } catch (e) { }
+
+    currentConfigGlobal = config; // Update global cache for limiter
+
+    // If testing locally (::1), map to a random public IP for testing geo features, else keep it
+    const cleanIp = (ip === '::1' || ip === '127.0.0.1') ? '103.244.175.10' : ip.replace('::ffff:', ''); // 103... is a Pakistan IP example for testing
+
 
     // Country Detection: Vercel Header -> GeoIP -> Default
     let country = req.headers['x-vercel-ip-country'];
@@ -418,8 +432,12 @@ app.use(async (req, res, next) => {
 
 // Primary Reverse Proxy with Dynamic Target
 app.use('/', limiter, (req, res, next) => {
-    // Skip if internal
-    if (req.url.startsWith('/api/') || req.url.startsWith('/dashboard') || req.url === '/health') {
+    // Skip if internal or static
+    const isControlApi = ['/api/stats', '/api/config', '/api/logs', '/api/unblock', '/health'].some(p => req.url === p || req.url.startsWith(p + '?'));
+    const isDashboard = req.url.startsWith('/dashboard') || req.url === '/dashboard';
+    const isStatic = /\.(js|css|png|jpg|jpeg|gif|ico|svg)$/.test(req.url);
+
+    if (isControlApi || isDashboard || isStatic) {
         return next();
     }
 

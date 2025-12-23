@@ -1,7 +1,27 @@
 {
     "rewrites": [
         {
-            "source": "/api/:path*",
+            "source": "/dashboard",
+            "destination": "/index.html"
+        },
+        {
+            "source": "/dashboard/(.*)",
+            "destination": "/$1"
+        },
+        {
+            "source": "/api/stats",
+            "destination": "/api/index.js"
+        },
+        {
+            "source": "/api/config",
+            "destination": "/api/index.js"
+        },
+        {
+            "source": "/api/logs",
+            "destination": "/api/index.js"
+        },
+        {
+            "source": "/api/unblock",
             "destination": "/api/index.js"
         },
         {
@@ -9,18 +29,13 @@
             "destination": "/api/index.js"
         },
         {
-            "source": "/dashboard",
-            "destination": "/index.html"
-        },
-        {
-            "source": "/dashboard/(.*)",
-            "destination": "/$1"
+            "source": "/((?!dashboard/).*)",
+            "destination": "/api/index.js"
         }
     ],
     "functions": {
         "api/index.js": {
-            "memory": 1024,
-            "maxDuration": 10
+            "maxDuration": 15
         }
     }
 }

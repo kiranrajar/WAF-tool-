@@ -136,11 +136,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const vectors = ['sqli', 'xss', 'traversal', 'rce', 'anomaly'];
         const targets = {
-            sqli: ["/login?user=admin' OR 1=1--", "/product?id=1; DROP TABLE users"],
-            xss: ["/search?q=<script>alert(1)</script>", "/user/<img src=x onerror=alert(1)>"],
-            traversal: ["/file?path=../../etc/passwd", "/d/..%2f..%2fwindows%2fwin.ini"],
-            rce: ["/cmd?exec=rm -rf /", "/api/ping?host=127.0.0.1|whoami"],
-            anomaly: ["/api/check?token=$$$$$$$$$$$$", "/v1/auth?key=invalid_hex_string_overflow"]
+            sqli: ["/search?q=' OR 1=1 --", "/login?u=admin'--", "/products/1; DROP TABLE users"],
+            xss: ["/search?q=<script>alert(1)</script>", "/user/<img src=x onerror=alert(1)>", "/comment?text=%3Cbody%20onload%3Dalert(1)%3E"],
+            traversal: ["/file?path=../../etc/passwd", "/d/..%2f..%2fwindows%2fwin.ini", "/static/../../.env"],
+            rce: ["/cmd?exec=rm -rf /", "/api/ping_test?host=127.0.0.1|whoami", "/v1/shell?c=ls%20-la"], // Changed to ping_test to avoid WAF bypass
+            anomaly: ["/api/check_test?token=$$$$$$$$$$$$", "/v1/auth?key=invalid_hex_string_overflow", "/data/process/%ff%00%11%22"]
         };
 
         for (let i = 0; i < 50; i++) {
