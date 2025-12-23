@@ -2,11 +2,19 @@
     "rewrites": [
         {
             "source": "/api/:path*",
-            "destination": "/api"
+            "destination": "/api/index.js"
         },
         {
             "source": "/health",
-            "destination": "/api"
+            "destination": "/api/index.js"
+        },
+        {
+            "source": "/dashboard",
+            "destination": "/index.html"
+        },
+        {
+            "source": "/dashboard/(.*)",
+            "destination": "/$1"
         }
     ],
     "functions": {
