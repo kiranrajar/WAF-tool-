@@ -1,10 +1,17 @@
 const API_BASE = "/api";
 const COUNTRY_COORDS = {
-    'US': { x: 20, y: 40 }, 'CN': { x: 80, y: 45 }, 'RU': { x: 75, y: 25 },
-    'GB': { x: 47, y: 30 }, 'DE': { x: 50, y: 32 }, 'FR': { x: 48, y: 35 },
-    'IN': { x: 72, y: 55 }, 'BR': { x: 33, y: 70 }, 'AU': { x: 88, y: 80 },
-    'CA': { x: 20, y: 25 }, 'JP': { x: 90, y: 40 }, 'KP': { x: 86, y: 40 },
-    'IR': { x: 65, y: 45 }, 'UA': { x: 58, y: 33 }, 'XX': { x: 50, y: 50 }
+    'US': { x: 22, y: 35 }, 'CN': { x: 78, y: 38 }, 'RU': { x: 70, y: 20 },
+    'GB': { x: 46, y: 28 }, 'DE': { x: 49, y: 30 }, 'FR': { x: 47, y: 32 },
+    'IN': { x: 70, y: 45 }, 'BR': { x: 32, y: 70 }, 'AU': { x: 85, y: 75 },
+    'CA': { x: 20, y: 20 }, 'JP': { x: 88, y: 38 }, 'KP': { x: 83, y: 38 },
+    'KR': { x: 83, y: 39 }, 'IR': { x: 62, y: 40 }, 'UA': { x: 55, y: 30 },
+    'PK': { x: 67, y: 42 }, 'SA': { x: 58, y: 48 }, 'ZA': { x: 55, y: 80 },
+    'EG': { x: 55, y: 40 }, 'NG': { x: 48, y: 55 }, 'MX': { x: 18, y: 45 },
+    'ID': { x: 80, y: 60 }, 'TR': { x: 58, y: 35 }, 'IT': { x: 50, y: 34 },
+    'ES': { x: 45, y: 35 }, 'NL': { x: 48, y: 29 }, 'SE': { x: 51, y: 22 },
+    'NO': { x: 49, y: 22 }, 'FI': { x: 54, y: 20 }, 'DK': { x: 49, y: 28 },
+    'PL': { x: 52, y: 30 }, 'RO': { x: 56, y: 33 }, 'GR': { x: 55, y: 37 },
+    'Unknown': { x: 50, y: 95 }
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -379,6 +386,12 @@ function updateMap(logs, stats) {
     if (document.getElementById('map-critical') && stats) {
         document.getElementById('map-critical').innerText = stats.mapCritical || 0;
         document.getElementById('map-anomalies').innerText = stats.mapAnomalies || 0;
+        // Hide loader if data is present
+        const loader = document.querySelector('.map-loader');
+        if (loader) loader.style.display = 'none';
+        // Or if map text is just static, hide it
+        const mapText = document.querySelector('.map-overlay-text');
+        if (mapText) mapText.style.display = 'none';
     }
 
     const now = Date.now();
