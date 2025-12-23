@@ -67,7 +67,14 @@ function initDataFiles() {
             rateLimit: 100,
             riskThreshold: 0.88,
             protectionMode: 'blocking',
-            targetUrl: 'http://books.toscrape.com'
+            targetUrl: 'http://books.toscrape.com',
+            modules: {
+                sqli: true,
+                xss: true,
+                pathTraversal: true,
+                rce: true,
+                bot: true
+            }
         }));
     }
 }
@@ -281,10 +288,18 @@ app.use(async (req, res, next) => {
 
         // 6. ML & Signature Inspection
         if (status === "Allowed") {
+            // Default modules if missing (backward compatibility)
+            const modules = config.modules || { sqli: true, xss: true, pathTraversal: true, rce: true, bot: true };
+
             const features = extractFeatures(req);
-            const botRisk = getFingerprintRisk(req);
+            let botRisk = 0;
+
+            if (modules.bot) {
+                botRisk = getFingerprintRisk(req);
+            }
+
             risk = 0.5 + botRisk;
-            type = botRisk > 0.4 ? "Automated Bot/Script" : "Normal";
+            type = (modules.bot && botRisk > 0.4) ? "Automated Bot/Script" : "Normal";
 
             try {
                 // Adjust ML URL for production/local
@@ -301,9 +316,19 @@ app.use(async (req, res, next) => {
 
             const payload = req.url + (req.body && Object.keys(req.body).length ? JSON.stringify(req.body) : "");
             const decodedPayload = decodeURIComponent(payload);
-            const detectedType = Object.keys(SIGNATURES).find(cat =>
-                SIGNATURES[cat].some(p => p.test(decodedPayload))
-            );
+
+            const moduleMap = {
+                'SQL Injection': modules.sqli,
+                'XSS': modules.xss,
+                'Path Traversal': modules.pathTraversal,
+                'WebShell/RCE': modules.rce
+            };
+
+            const detectedType = Object.keys(SIGNATURES).find(cat => {
+                // Skip if module is disabled
+                if (moduleMap[cat] === false) return false;
+                return SIGNATURES[cat].some(p => p.test(decodedPayload));
+            });
 
             if (detectedType) {
                 type = detectedType;

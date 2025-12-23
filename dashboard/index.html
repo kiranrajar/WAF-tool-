@@ -149,41 +149,18 @@
         <div id="firewall-tab" class="tab-content">
             <header>
                 <div class="header-meta">
-                    <h1>Firewall Control Center</h1>
-                    <p>Manage access policies and IP reputation</p>
+                    <h1>Access Control</h1>
+                    <p>Manage IP blacklists and access rules</p>
                 </div>
             </header>
             <div class="firewall-manager">
-                <div class="card firewall-card">
+                <div class="card firewall-card" style="width: 100%;">
                     <h3>IP Blacklist</h3>
                     <p class="card-description">Permanently blocked addresses</p>
                     <div class="ip-list" id="blacklist-view"></div>
                     <div class="input-group">
                         <input type="text" id="add-ip-field" placeholder="Enter IP address (e.g. 192.168.1.100)">
                         <button id="btn-add-ip" class="btn btn-primary">Add to Blacklist</button>
-                    </div>
-                </div>
-                <div class="card firewall-card">
-                    <h3>Policy Configuration</h3>
-                    <div class="settings-form">
-                        <div class="form-item">
-                            <label>Protected Application (Target URL)</label>
-                            <input type="text" id="cfg-target" placeholder="http://localhost:5000">
-                        </div>
-                        <div class="form-item">
-                            <label>Rate Limit (Req/Min)</label>
-                            <input type="number" id="cfg-rate-limit" value="100">
-                        </div>
-                        <div class="form-item">
-                            <label>Risk Threshold (%)</label>
-                            <input type="number" id="cfg-threshold" value="88">
-                        </div>
-                        <div class="form-item">
-                            <label>Geo-Blocked Countries (ISO)</label>
-                            <input type="text" id="cfg-geo" placeholder="CN, RU, KP">
-                        </div>
-                        <button id="save-config" class="btn btn-block" style="margin-top: 15px;">Save Security
-                            Policy</button>
                     </div>
                 </div>
             </div>
@@ -286,88 +263,98 @@
         <div id="settings-tab" class="tab-content">
             <header>
                 <div class="header-meta">
-                    <h1>Engine Configuration</h1>
-                    <p>Advanced security engine and ML model parameters</p>
+                    <h1>Global Configuration</h1>
+                    <p>Manage application target, policies, and detection modules</p>
                 </div>
             </header>
             <div class="settings-grid">
                 <div class="card">
-                    <h3>Machine Learning Parameters</h3>
-                    <div class="settings-list">
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <span class="setting-label">Model Version</span>
-                                <span class="setting-desc">Isolation Forest v2.5</span>
-                            </div>
-                            <span class="setting-value">Active</span>
+                    <h3>Application Policy</h3>
+                    <div class="settings-form">
+                        <div class="form-item" style="margin-bottom: 1rem;">
+                            <label
+                                style="display:block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">Protected
+                                Application (Target URL)</label>
+                            <input type="text" id="cfg-target" placeholder="http://localhost:5000"
+                                style="width: 100%; padding: 0.75rem; background: var(--bg-main); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;">
                         </div>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <span class="setting-label">Contamination Rate</span>
-                                <span class="setting-desc">Anomaly detection sensitivity</span>
-                            </div>
-                            <span class="setting-value">10%</span>
+                        <div class="form-item" style="margin-bottom: 1rem;">
+                            <label
+                                style="display:block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">Rate
+                                Limit (Req/Min)</label>
+                            <input type="number" id="cfg-rate-limit" value="100"
+                                style="width: 100%; padding: 0.75rem; background: var(--bg-main); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;">
                         </div>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <span class="setting-label">Feature Vector Size</span>
-                                <span class="setting-desc">Input dimensions for ML model</span>
-                            </div>
-                            <span class="setting-value">6 features</span>
+                        <div class="form-item" style="margin-bottom: 1rem;">
+                            <label
+                                style="display:block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">Risk
+                                Threshold (%)</label>
+                            <input type="number" id="cfg-threshold" value="88"
+                                style="width: 100%; padding: 0.75rem; background: var(--bg-main); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;">
                         </div>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <span class="setting-label">Training Dataset</span>
-                                <span class="setting-desc">Synthetic attack samples</span>
-                            </div>
-                            <span class="setting-value">2000+ samples</span>
+                        <div class="form-item" style="margin-bottom: 1rem;">
+                            <label
+                                style="display:block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">Protection
+                                Mode</label>
+                            <select id="cfg-mode"
+                                style="width: 100%; padding: 0.75rem; background: var(--bg-main); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;">
+                                <option value="blocking">🛡️ Blocking (Active Defense)</option>
+                                <option value="learning">👀 Learning (Log Only)</option>
+                            </select>
+                        </div>
+                        <div class="form-item">
+                            <label
+                                style="display:block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">Geo-Blocked
+                                Countries (ISO)</label>
+                            <input type="text" id="cfg-geo" placeholder="CN, RU, KP"
+                                style="width: 100%; padding: 0.75rem; background: var(--bg-main); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;">
                         </div>
                     </div>
                 </div>
                 <div class="card">
-                    <h3>Detection Parameters</h3>
+                    <h3>Security Modules</h3>
                     <div class="settings-list">
                         <div class="setting-item">
                             <div class="setting-info">
-                                <span class="setting-label">Risk Threshold</span>
-                                <span class="setting-desc">Auto-block trigger point</span>
+                                <span class="setting-label">SQL Injection</span>
+                                <span class="setting-desc">Detect SQLi payloads</span>
                             </div>
-                            <span class="setting-value danger-text">88%</span>
+                            <input type="checkbox" id="mod-sqli" class="toggle-switch">
                         </div>
                         <div class="setting-item">
                             <div class="setting-info">
-                                <span class="setting-label">Signature Database</span>
-                                <span class="setting-desc">Known attack patterns</span>
+                                <span class="setting-label">Cross-Site Scripting (XSS)</span>
+                                <span class="setting-desc">Detect script injection</span>
                             </div>
-                            <span class="setting-value">4 categories</span>
+                            <input type="checkbox" id="mod-xss" class="toggle-switch">
                         </div>
                         <div class="setting-item">
                             <div class="setting-info">
-                                <span class="setting-label">Entropy Analysis</span>
-                                <span class="setting-desc">Payload randomness detection</span>
+                                <span class="setting-label">Path Traversal</span>
+                                <span class="setting-desc">Detect file system access</span>
                             </div>
-                            <span class="setting-value success-text">Enabled</span>
+                            <input type="checkbox" id="mod-path" class="toggle-switch">
                         </div>
                         <div class="setting-item">
                             <div class="setting-info">
-                                <span class="setting-label">URL Decoding</span>
-                                <span class="setting-desc">Bypass prevention</span>
+                                <span class="setting-label">Command Injection (RCE)</span>
+                                <span class="setting-desc">Detect system commands</span>
                             </div>
-                            <span class="setting-value success-text">Active</span>
+                            <input type="checkbox" id="mod-rce" class="toggle-switch">
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <span class="setting-label">Bot Analysis</span>
+                                <span class="setting-desc">Detect automated scripts</span>
+                            </div>
+                            <input type="checkbox" id="mod-bot" class="toggle-switch">
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="card">
-                <h3>System Logs</h3>
-                <div class="log-viewer">
-                    <div class="log-entry">[INFO] AEGIS Shield initialized successfully</div>
-                    <div class="log-entry">[INFO] ML Engine loaded: model.pkl (860KB)</div>
-                    <div class="log-entry">[INFO] Signature database: 4 threat categories active</div>
-                    <div class="log-entry">[INFO] Rate limiting: 15 requests/minute</div>
-                    <div class="log-entry">[INFO] Reputation system: Active</div>
-                    <div class="log-entry success-log">[SUCCESS] All protection layers operational</div>
-                </div>
+            <div class="card" style="margin-top: 20px;">
+                <button id="save-config" class="btn btn-primary"
+                    style="width: 100%; justify-content: center; padding: 1rem;">Save System Configuration</button>
             </div>
         </div>
     </main>

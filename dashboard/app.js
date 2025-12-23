@@ -40,13 +40,21 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Configuration Sync
+    // Configuration Sync
     document.getElementById('save-config')?.addEventListener('click', async () => {
         const config = {
             targetUrl: document.getElementById('cfg-target').value,
             rateLimit: parseInt(document.getElementById('cfg-rate-limit').value),
             riskThreshold: parseFloat(document.getElementById('cfg-threshold').value) / 100,
             blockedCountries: document.getElementById('cfg-geo').value.split(',').map(s => s.trim().toUpperCase()),
-            protectionMode: document.getElementById('protection-mode').value
+            protectionMode: document.getElementById('cfg-mode').value,
+            modules: {
+                sqli: document.getElementById('mod-sqli').checked,
+                xss: document.getElementById('mod-xss').checked,
+                pathTraversal: document.getElementById('mod-path').checked,
+                rce: document.getElementById('mod-rce').checked,
+                bot: document.getElementById('mod-bot').checked
+            }
         };
 
         const res = await fetch(`${API_BASE}/config`, {
@@ -55,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
             body: JSON.stringify(config)
         });
 
-        if (res.ok) showToast("✅ Security policy updated and deployed");
+        if (res.ok) showToast("✅ Global configuration updated and modules hot-reloaded");
     });
 
     document.getElementById('protection-mode')?.addEventListener('change', () => {
@@ -151,11 +159,24 @@ function updateUI(logs, stats) {
             const el = document.getElementById(id);
             if (el) el.value = v || '';
         };
+        const setCheck = (id, v) => {
+            const el = document.getElementById(id);
+            if (el) el.checked = v !== false; // Default true if undefined
+        };
+
         setVal('cfg-target', config.targetUrl);
         setVal('cfg-rate-limit', config.rateLimit);
         setVal('cfg-threshold', Math.round((config.riskThreshold || 0.5) * 100));
         setVal('cfg-geo', config.blockedCountries?.join(', '));
-        setVal('protection-mode', config.protectionMode);
+        setVal('protection-mode', config.protectionMode); // Keep header sync
+        setVal('cfg-mode', config.protectionMode);       // Sync settings tab
+
+        const modules = config.modules || {};
+        setCheck('mod-sqli', modules.sqli);
+        setCheck('mod-xss', modules.xss);
+        setCheck('mod-path', modules.pathTraversal);
+        setCheck('mod-rce', modules.rce);
+        setCheck('mod-bot', modules.bot);
     }
 
     // Table
