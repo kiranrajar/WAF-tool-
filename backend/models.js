@@ -12,7 +12,8 @@ const logSchema = new mongoose.Schema({
     status: String,
     type: String,
     responseTime: Number,
-    isBot: Boolean
+    isBot: Boolean,
+    payload: String
 });
 
 const blacklistSchema = new mongoose.Schema({

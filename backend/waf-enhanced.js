@@ -395,18 +395,26 @@ app.use('/', limiter, (req, res, next) => {
 });
 
 // Admin API
-app.get('/api/stats', (req, res) => {
+app.get('/api/stats', async (req, res) => {
     try {
-        initDataFiles(); // Ensure files exist
-        const logs = JSON.parse(fs.readFileSync(LOG_FILE, 'utf8'));
-        const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE, 'utf8'));
-        const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+        let logs = [], blacklist = [], config = {};
+
+        if (MONGODB_URI) {
+            logs = await Log.find().lean();
+            blacklist = await Blacklist.find().lean();
+            if (fs.existsSync(CONFIG_FILE)) config = JSON.parse(fs.readFileSync(CONFIG_FILE));
+        } else {
+            initDataFiles(); // Ensure files exist
+            logs = JSON.parse(fs.readFileSync(LOG_FILE, 'utf8'));
+            blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE, 'utf8'));
+            config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+        }
 
         const blocked = logs.filter(l => l.status === "Blocked").length;
 
         // Accurate Map Stats calculated from full historical logs
-        const mapCritical = logs.filter(l => l.status === "Blocked" && (l.risk >= 0.8 || l.type.includes('Honeypot'))).length;
-        const mapAnomalies = logs.filter(l => l.status === "Blocked" && (l.risk < 0.8 && !l.type.includes('Honeypot'))).length;
+        const mapCritical = logs.filter(l => l.status === "Blocked" && (l.risk >= 0.8 || (l.type && l.type.includes('Honeypot')))).length;
+        const mapAnomalies = logs.filter(l => l.status === "Blocked" && (l.risk < 0.8 && (!l.type || !l.type.includes('Honeypot')))).length;
 
         const threats = logs.reduce((acc, l) => {
             if (l.type !== "Normal") acc[l.type] = (acc[l.type] || 0) + 1;
@@ -430,8 +438,12 @@ app.get('/api/stats', (req, res) => {
     }
 });
 
-app.get('/api/logs', (req, res) => {
+app.get('/api/logs', async (req, res) => {
     try {
+        if (MONGODB_URI) {
+            const logs = await Log.find().sort({ timestamp: -1 }).limit(50);
+            return res.json(logs);
+        }
         initDataFiles();
         const logs = JSON.parse(fs.readFileSync(LOG_FILE, 'utf8'));
         res.json(logs.reverse().slice(0, 50));
@@ -440,29 +452,61 @@ app.get('/api/logs', (req, res) => {
     }
 });
 
-app.get('/api/config', (req, res) => {
+app.get('/api/config', async (req, res) => {
     try {
         initDataFiles();
         const config = JSON.parse(fs.readFileSync(CONFIG_FILE));
-        const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
-        res.json({ ...config, blacklist: blacklist.map(b => b.ip) });
+        let blacklistIps = [];
+
+        if (MONGODB_URI) {
+            const bl = await Blacklist.find().lean();
+            blacklistIps = bl.map(b => b.ip);
+        } else {
+            const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
+            blacklistIps = blacklist.map(b => b.ip);
+        }
+        res.json({ ...config, blacklist: blacklistIps });
     } catch (e) { res.status(500).send("Config Error"); }
 });
 
-app.post('/api/config', (req, res) => {
+app.post('/api/config', async (req, res) => {
     try {
         const newConfig = req.body;
+        // Handle blacklist additions via config sync (if sent)
+        if (newConfig.blacklist && Array.isArray(newConfig.blacklist) && MONGODB_URI) {
+            // This is a simplified approach; ideally we have a separate endpoint for adding IPs
+            // For now, we update local file OR assume UI calls separate logic.
+            // The UI calls /config for updating simple settings. 
+            // If blacklist is here, we might want to sync it.
+            // But let's keep config file as source of truth for settings
+        }
         fs.writeFileSync(CONFIG_FILE, JSON.stringify(newConfig, null, 2));
+
+        // If there's blacklist in body and we have DB, sync it
+        if (newConfig.blacklist && MONGODB_URI) {
+            for (const ip of newConfig.blacklist) {
+                await Blacklist.updateOne({ ip }, { ip, reason: "Manual Block" }, { upsert: true });
+            }
+        }
+
         res.json({ success: true });
     } catch (e) { res.status(500).send("Write Error"); }
 });
 
-app.post('/api/unblock', (req, res) => {
+app.post('/api/unblock', async (req, res) => {
     try {
         const { ip } = req.body;
-        const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
-        const filtered = blacklist.filter(b => b.ip !== ip);
-        fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(filtered, null, 2));
+        if (MONGODB_URI) {
+            await Blacklist.deleteOne({ ip });
+        }
+
+        // Also update local file for redundancy/UI consistency
+        if (fs.existsSync(BLACKLIST_FILE)) {
+            const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
+            const filtered = blacklist.filter(b => b.ip !== ip);
+            fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(filtered, null, 2));
+        }
+
         res.json({ success: true });
     } catch (e) { res.status(500).send("Write Error"); }
 });
