@@ -74,21 +74,23 @@ const DEFAULT_CONFIG = {
 };
 
 async function initDataFiles() {
-    if (!fs.existsSync(LOG_FILE)) fs.writeFileSync(LOG_FILE, JSON.stringify([]));
-    if (!fs.existsSync(BLACKLIST_FILE)) fs.writeFileSync(BLACKLIST_FILE, JSON.stringify([]));
+    try {
+        if (!fs.existsSync(LOG_FILE)) fs.writeFileSync(LOG_FILE, JSON.stringify([]));
+        if (!fs.existsSync(BLACKLIST_FILE)) fs.writeFileSync(BLACKLIST_FILE, JSON.stringify([]));
 
-    if (MONGODB_URI) {
-        try {
+        if (MONGODB_URI && mongoose.connection.readyState === 1) {
             const exists = await Config.findOne({ id: 'global' });
             if (!exists) {
                 await Config.create({ id: 'global', ...DEFAULT_CONFIG });
                 console.log("✅ Initialized Default Config in MongoDB");
             }
-        } catch (e) { console.error("DB Init Error:", e); }
-    }
+        }
 
-    if (!fs.existsSync(CONFIG_FILE)) {
-        fs.writeFileSync(CONFIG_FILE, JSON.stringify(DEFAULT_CONFIG));
+        if (!fs.existsSync(CONFIG_FILE)) {
+            fs.writeFileSync(CONFIG_FILE, JSON.stringify(DEFAULT_CONFIG));
+        }
+    } catch (e) {
+        console.warn("Init Files Warning:", e.message);
     }
 }
 
@@ -557,25 +559,36 @@ app.get('/api/config', async (req, res) => {
 app.post('/api/config', async (req, res) => {
     try {
         const newConfig = req.body;
-        console.log("⚙️  Received Configuration Update:", JSON.stringify(newConfig));
+        console.log("⚙️  Saving Configuration Update...");
 
-        if (MONGODB_URI) {
+        if (MONGODB_URI && mongoose.connection.readyState === 1) {
+            // Update MongoDB primarily
             await Config.updateOne({ id: 'global' }, { $set: newConfig }, { upsert: true });
-        } else {
-            fs.writeFileSync(CONFIG_FILE, JSON.stringify(newConfig, null, 2));
         }
 
-        // If there's blacklist in body and we have DB, sync it
-        if (newConfig.blacklist && MONGODB_URI) {
-            for (const ip of newConfig.blacklist) {
-                await Blacklist.updateOne({ ip }, { ip, reason: "Manual Block" }, { upsert: true });
+        // Always try to update local cache file for the current instance's fast-path
+        try {
+            fs.writeFileSync(CONFIG_FILE, JSON.stringify(newConfig, null, 2));
+        } catch (err) {
+            console.warn("Local config cache save failed (expected on Vercel serverless):", err.message);
+        }
+
+        // Fast-path for Blacklist sync
+        if (newConfig.blacklist && MONGODB_URI && mongoose.connection.readyState === 1) {
+            // Only update DB if they actually changed
+            const existing = await Blacklist.find().lean();
+            const existingIps = existing.map(b => b.ip);
+
+            const newIps = newConfig.blacklist.filter(ip => !existingIps.includes(ip));
+            if (newIps.length > 0) {
+                await Blacklist.insertMany(newIps.map(ip => ({ ip, reason: "Manual Block" })));
             }
         }
 
-        res.json({ success: true, message: "Configuration saved successfully" });
+        res.json({ success: true, message: "Configuration persistent in Cloud" });
     } catch (e) {
         console.error("Config Save Error:", e);
-        res.status(500).send("Write Error");
+        res.status(500).json({ success: false, error: e.message });
     }
 });
 
