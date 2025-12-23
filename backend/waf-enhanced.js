@@ -67,7 +67,7 @@ function initDataFiles() {
             rateLimit: 100,
             riskThreshold: 0.88,
             protectionMode: 'blocking',
-            targetUrl: 'http://localhost:5000'
+            targetUrl: 'http://books.toscrape.com'
         }));
     }
 }
