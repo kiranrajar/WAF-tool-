@@ -185,14 +185,11 @@ let currentConfig = {};
 
 async function syncData(syncInputs = false) {
     try {
-        const [logsRes, statsRes] = await Promise.all([
-            fetch(`${API_BASE}/logs`),
-            fetch(`${API_BASE}/stats`)
-        ]);
+        const res = await fetch(`${API_BASE}/stats`);
+        const stats = await res.json();
 
-        const logs = await logsRes.json();
-        const stats = await statsRes.json();
         currentConfig = stats.config || {};
+        const logs = stats.recentLogs || [];
 
         if (stats.total !== undefined) {
             updateUI(logs, stats, syncInputs);

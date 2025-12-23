@@ -528,10 +528,10 @@ app.get('/api/stats', async (req, res) => {
             threats, mapCritical, mapAnomalies,
             blacklistCount: blacklist.length,
             config,
-            recentLogs: logs // Send small slice for charts
+            recentLogs: logs.map(l => l.toObject ? l.toObject() : l) // Ensure plain JS objects
         });
     } catch (err) {
-        console.error(err);
+        console.error("Stats API Error:", err);
         res.status(500).json({ error: "Failed to read data" });
     }
 });
