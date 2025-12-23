@@ -1,0 +1,28 @@
+{
+    "name": "aegis-shield-waf",
+    "version": "3.0.0",
+    "description": "Production-grade AI-powered Web Application Firewall",
+    "main": "api/index.js",
+    "scripts": {
+        "build": "echo 'Build complete'",
+        "start": "node backend/waf-enhanced.js"
+    },
+    "dependencies": {
+        "axios": "^1.13.2",
+        "better-sqlite3": "^12.5.0",
+        "body-parser": "^1.20.4",
+        "cors": "^2.8.5",
+        "dotenv": "^16.6.1",
+        "express": "^4.22.1",
+        "express-rate-limit": "^8.2.1",
+        "express-useragent": "^2.0.2",
+        "geoip-lite": "^1.4.10",
+        "http-proxy-middleware": "^3.0.5",
+        "mongoose": "^9.0.2",
+        "node-cache": "^5.1.2",
+        "ua-parser-js": "^1.0.41"
+    },
+    "engines": {
+        "node": ">=18.x"
+    }
+}

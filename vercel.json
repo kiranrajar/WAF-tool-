@@ -1,36 +1,43 @@
 {
     "version": 2,
     "name": "aegis-shield-waf",
-    "builds": [
+    "buildCommand": "cd backend && npm install",
+    "rewrites": [
         {
-            "src": "backend/waf-enhanced.js",
-            "use": "@vercel/node"
+            "source": "/api/:path*",
+            "destination": "/api"
         },
         {
-            "src": "ml/api.py",
-            "use": "@vercel/python"
+            "source": "/score",
+            "destination": "/ml/api.py"
         },
         {
-            "src": "dashboard/**",
-            "use": "@vercel/static"
+            "source": "/health",
+            "destination": "/api"
         }
     ],
-    "routes": [
+    "redirects": [
         {
-            "src": "/api/(.*)",
-            "dest": "backend/waf-enhanced.js"
-        },
-        {
-            "src": "/score",
-            "dest": "ml/api.py"
-        },
-        {
-            "src": "/dashboard/(.*)",
-            "dest": "dashboard/$1"
-        },
-        {
-            "src": "/(.*)",
-            "dest": "backend/waf-enhanced.js"
+            "source": "/",
+            "destination": "/dashboard",
+            "permanent": false
         }
-    ]
+    ],
+    "headers": [
+        {
+            "source": "/dashboard/:path*",
+            "headers": [
+                {
+                    "key": "Cache-Control",
+                    "value": "public, max-age=0, must-revalidate"
+                }
+            ]
+        }
+    ],
+    "functions": {
+        "api/index.js": {
+            "memory": 1024,
+            "maxDuration": 10
+        }
+    }
 }
