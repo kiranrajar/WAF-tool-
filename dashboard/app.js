@@ -40,20 +40,21 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Configuration Sync
-    // Configuration Sync
     document.getElementById('save-config')?.addEventListener('click', async () => {
+        const getCheck = (id) => document.getElementById(id)?.checked ?? true; // Default true if missing
+
         const config = {
             targetUrl: document.getElementById('cfg-target').value,
             rateLimit: parseInt(document.getElementById('cfg-rate-limit').value),
             riskThreshold: parseFloat(document.getElementById('cfg-threshold').value) / 100,
             blockedCountries: document.getElementById('cfg-geo').value.split(',').map(s => s.trim().toUpperCase()),
-            protectionMode: document.getElementById('cfg-mode').value,
+            protectionMode: document.getElementById('cfg-mode') ? document.getElementById('cfg-mode').value : 'blocking',
             modules: {
-                sqli: document.getElementById('mod-sqli').checked,
-                xss: document.getElementById('mod-xss').checked,
-                pathTraversal: document.getElementById('mod-path').checked,
-                rce: document.getElementById('mod-rce').checked,
-                bot: document.getElementById('mod-bot').checked
+                sqli: getCheck('mod-sqli'),
+                xss: getCheck('mod-xss'),
+                pathTraversal: getCheck('mod-path'),
+                rce: getCheck('mod-rce'),
+                bot: getCheck('mod-bot')
             }
         };
 
@@ -159,17 +160,19 @@ function updateUI(logs, stats) {
             const el = document.getElementById(id);
             if (el) el.value = v || '';
         };
+        // Default true if missing or undefined in config, but handle UI existence check
         const setCheck = (id, v) => {
             const el = document.getElementById(id);
-            if (el) el.checked = v !== false; // Default true if undefined
+            if (el) el.checked = v !== false;
         };
 
         setVal('cfg-target', config.targetUrl);
         setVal('cfg-rate-limit', config.rateLimit);
         setVal('cfg-threshold', Math.round((config.riskThreshold || 0.5) * 100));
         setVal('cfg-geo', config.blockedCountries?.join(', '));
-        setVal('protection-mode', config.protectionMode); // Keep header sync
-        setVal('cfg-mode', config.protectionMode);       // Sync settings tab
+        // Try both new and old IDs
+        if (document.getElementById('protection-mode')) setVal('protection-mode', config.protectionMode);
+        if (document.getElementById('cfg-mode')) setVal('cfg-mode', config.protectionMode);
 
         const modules = config.modules || {};
         setCheck('mod-sqli', modules.sqli);
