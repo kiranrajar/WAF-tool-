@@ -41,13 +41,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Configuration Sync
     document.getElementById('save-config')?.addEventListener('click', async () => {
-        const getCheck = (id) => document.getElementById(id)?.checked ?? true; // Default true if missing
+        const btn = document.getElementById('save-config');
+        const originalText = btn.innerText;
+        btn.innerText = "Saving...";
+        btn.disabled = true;
+
+        const getCheck = (id) => document.getElementById(id)?.checked ?? true;
 
         const config = {
-            targetUrl: document.getElementById('cfg-target').value,
-            rateLimit: parseInt(document.getElementById('cfg-rate-limit').value),
+            targetUrl: document.getElementById('cfg-target').value, // Allow empty or custom
+            rateLimit: parseInt(document.getElementById('cfg-rate-limit').value) || 100,
             riskThreshold: parseFloat(document.getElementById('cfg-threshold').value) / 100,
-            blockedCountries: document.getElementById('cfg-geo').value.split(',').map(s => s.trim().toUpperCase()),
+            blockedCountries: document.getElementById('cfg-geo').value.split(',').map(s => s.trim().toUpperCase()).filter(s => s.length === 2),
             protectionMode: document.getElementById('cfg-mode') ? document.getElementById('cfg-mode').value : 'blocking',
             modules: {
                 sqli: getCheck('mod-sqli'),
@@ -58,18 +63,42 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
-        const res = await fetch(`${API_BASE}/config`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(config)
+        try {
+            const res = await fetch(`${API_BASE}/config`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            });
+
+            if (res.ok) {
+                showToast("✅ Global configuration updated and modules hot-reloaded");
+                syncData(); // Refresh UI to confirm persistence
+            } else {
+                showToast("❌ Failed to save configuration");
+            }
+        } catch (e) {
+            showToast("❌ Network Error: Could not save config");
+        } finally {
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }
+    });
+
+    // Sync Protection Mode Dropdowns
+    const headerMode = document.getElementById('protection-mode');
+    const settingMode = document.getElementById('cfg-mode');
+
+    if (headerMode && settingMode) {
+        headerMode.addEventListener('change', () => {
+            settingMode.value = headerMode.value;
+            document.getElementById('save-config').click();
         });
-
-        if (res.ok) showToast("✅ Global configuration updated and modules hot-reloaded");
-    });
-
-    document.getElementById('protection-mode')?.addEventListener('change', () => {
-        document.getElementById('save-config').click();
-    });
+        settingMode.addEventListener('change', () => {
+            headerMode.value = settingMode.value;
+            // distinct from save, just sync UI until save clicked? 
+            // actually user expects save on settings page usually manually, but header is quick toggle
+        });
+    }
 
     // Refresh Data
     document.getElementById('refresh-data')?.addEventListener('click', syncData);
@@ -99,6 +128,38 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Red Team: Carpet Bomb
+    document.getElementById('carpet-bomb-btn')?.addEventListener('click', async () => {
+        const modal = document.getElementById('sim-modal');
+        modal.classList.remove('active');
+        showToast("🔥 Initiating Carpet Bomb Attack Sequence...");
+
+        const vectors = ['sqli', 'xss', 'traversal', 'rce', 'anomaly'];
+        const targets = {
+            sqli: ["/login?user=admin' OR 1=1--", "/product?id=1; DROP TABLE users"],
+            xss: ["/search?q=<script>alert(1)</script>", "/user/<img src=x onerror=alert(1)>"],
+            traversal: ["/file?path=../../etc/passwd", "/d/..%2f..%2fwindows%2fwin.ini"],
+            rce: ["/cmd?exec=rm -rf /", "/api/ping?host=127.0.0.1|whoami"],
+            anomaly: ["/api/check?token=$$$$$$$$$$$$", "/v1/auth?key=invalid_hex_string_overflow"]
+        };
+
+        for (let i = 0; i < 50; i++) {
+            // Randomly select vector
+            const vector = vectors[Math.floor(Math.random() * vectors.length)];
+            const payload = targets[vector][Math.floor(Math.random() * targets[vector].length)];
+
+            // Fire and Forget (don't await response to simulate concurrent flood)
+            fetch(payload).catch(e => { });
+
+            // Small random delay (50-150ms) to look like a script
+            await new Promise(r => setTimeout(r, Math.floor(Math.random() * 100) + 50));
+
+            if (i % 10 === 0) showToast(`🔥 Flooding... Request ${i}/50`);
+        }
+        showToast("✅ Red Team Exercise Complete");
+        syncData();
+    });
+
     // Firewall
     document.getElementById('btn-add-ip').addEventListener('click', async () => {
         const ip = document.getElementById('add-ip-field').value;
@@ -116,11 +177,13 @@ document.addEventListener('DOMContentLoaded', () => {
             syncData();
         }
     });
+
+
 });
 
 let currentConfig = {};
 
-async function syncData() {
+async function syncData(syncInputs = false) {
     try {
         const [logsRes, statsRes] = await Promise.all([
             fetch(`${API_BASE}/logs`),
@@ -132,7 +195,7 @@ async function syncData() {
         currentConfig = stats.config || {};
 
         if (stats.total !== undefined) {
-            updateUI(logs, stats);
+            updateUI(logs, stats, syncInputs);
             updateMap(logs, stats);
         }
     } catch (err) {
@@ -140,7 +203,9 @@ async function syncData() {
     }
 }
 
-function updateUI(logs, stats) {
+
+
+function updateUI(logs, stats, syncInputs) {
     const config = stats.config || {};
 
     // Stats Cards
@@ -154,8 +219,8 @@ function updateUI(logs, stats) {
     safeSetText('stat-risk', (stats.avgRisk || 0).toFixed(3));
     safeSetText('stat-bans', stats.blacklistCount || 0);
 
-    // Config Fields
-    if (document.getElementById('save-config') && config) {
+    // Config Fields (Only update when explicitly requested)
+    if (syncInputs && document.getElementById('save-config') && config) {
         const setVal = (id, v) => {
             const el = document.getElementById(id);
             if (el) el.value = v || '';
@@ -221,7 +286,7 @@ function updateUI(logs, stats) {
     `).join('');
 
     // Threat Intelligence
-    updateThreatIntel(stats);
+    updateThreatIntel(logs);
 
     // Geo Stats
     updateGeoStats(logs);
@@ -230,28 +295,41 @@ function updateUI(logs, stats) {
     checkForNewAnomalies(logs);
 }
 
-function updateThreatIntel(stats) {
-    const threats = stats.threats || {};
-    const total = Object.values(threats).reduce((a, b) => a + b, 0) || 1;
+function updateThreatIntel(logs) {
+    if (!logs || logs.length === 0) return;
+
+    const counts = { xss: 0, sqli: 0, path: 0, rce: 0 };
+    logs.forEach(l => {
+        if (l.type.includes('XSS')) counts.xss++;
+        if (l.type.includes('SQL')) counts.sqli++;
+        if (l.type.includes('Traversal')) counts.path++;
+        if (l.type.includes('Command') || l.type.includes('RCE')) counts.rce++;
+    });
+
+    const total = logs.length || 1;
 
     // Update counts and bars
-    updateThreatBar('sqli', threats['SQL Injection'] || 0, total);
-    updateThreatBar('xss', threats['XSS'] || 0, total);
-    updateThreatBar('path', threats['Path Traversal'] || 0, total);
-    updateThreatBar('rce', threats['WebShell/RCE'] || 0, total);
+    const updateBar = (id, count) => {
+        const el = document.getElementById(id + '-count');
+        const bar = document.getElementById(id + '-bar');
+        if (el) el.innerText = count;
+        if (bar) bar.style.width = Math.min(100, (count / total) * 100) + '%';
+    };
+
+    updateBar('xss', counts.xss);
+    updateBar('sqli', counts.sqli);
+    updateBar('path', counts.path);
+    updateBar('rce', counts.rce);
 
     // Timeline stats
-    const blocked = Object.values(threats).reduce((a, b) => a + b, 0);
-    document.getElementById('attacks-hour').innerText = blocked;
-    document.getElementById('attacks-day').innerText = blocked;
-    document.getElementById('peak-time').innerText = new Date().toLocaleTimeString().substring(0, 5);
-}
+    const blocked = logs.filter(l => l.status === 'Blocked' || l.status === 'Dropped (Stealth)').length;
 
-function updateThreatBar(id, count, total) {
-    const countElem = document.getElementById(`${id}-count`);
-    const barElem = document.getElementById(`${id}-bar`);
-    if (countElem) countElem.innerText = count;
-    if (barElem) barElem.style.width = `${(count / total) * 100}%`;
+    // Last Hour vs 24H (Approximation based on available logs - usually recent 500)
+    // Note: logs are just the last N in memory/file, so we just show total visible log stats
+    const safeText = (id, txt) => { if (document.getElementById(id)) document.getElementById(id).innerText = txt; };
+    safeText('attacks-hour', blocked);
+    safeText('attacks-day', blocked); // Since logs are transient in this demo, just equal for now
+    safeText('peak-time', new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
 }
 
 function updateGeoStats(logs) {

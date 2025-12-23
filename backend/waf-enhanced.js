@@ -78,6 +78,8 @@ function initDataFiles() {
         }));
     }
 }
+
+
 initDataFiles();
 
 app.use(cors());
@@ -100,6 +102,7 @@ const limiter = rateLimit({
     message: { error: "Too many requests. AEGIS DDoS Protection active." },
     standardHeaders: true,
     legacyHeaders: false,
+    skip: (req) => req.url.startsWith('/api/') || req.url.startsWith('/dashboard') || req.url === '/health'
 });
 
 // Serve static files (Dashboard)
@@ -244,7 +247,13 @@ app.use(async (req, res, next) => {
     // Capture Payload for logging
     const currentPayload = req.method + " " + req.url + (Object.keys(req.body || {}).length ? " " + JSON.stringify(req.body) : "");
 
-    // 2. Internal Route Check
+    // 2. Lockdown Mode Check (ZoneAlarm Style "Internet Lock")
+    if (config.protectionMode === 'lockdown' && !req.url.startsWith('/api/') && !req.url.startsWith('/dashboard')) {
+        await logRequest({ ip: cleanIp, country, method: req.method, url: req.url, type: 'Manual Lockdown', risk: 1.0, status: 'Blocked', payload: currentPayload, isBot: false });
+        return res.status(403).send("<h1>🛡️ SYSTEM LOCKDOWN ACTIVE</h1><p>All traffic is currently suspended by the administrator.</p>");
+    }
+
+    // 3. Internal Route Check
     if (req.url.startsWith('/api/') || req.url.startsWith('/dashboard') || req.url === '/health') {
         return next();
     }
@@ -254,12 +263,22 @@ app.use(async (req, res, next) => {
     let risk = 0.0;
 
     try {
+        // 0. Trusted Zone (Whitelist) - ZoneAlarm "Trusted" Concept
+        const whitelist = config.whitelist || [];
+        if (whitelist.includes(cleanIp)) {
+            status = "Trusted";
+            type = "Whitelisted IP";
+            risk = 0.0;
+            // Bypass all other checks
+        }
+
         // 3. Honeypot Check
         const honeyPaths = ['/.env', '/admin_setup', '/wp-admin', '/phpmyadmin', '/backup.zip'];
         if (status === "Allowed" && honeyPaths.some(p => req.url.includes(p))) {
             status = "Blocked";
             type = "WAF Honeypot Trap";
             risk = 1.0;
+            updateReputation(cleanIp, -50); // Massive penalty
 
             const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
             if (!blacklist.find(b => b.ip === cleanIp)) {
@@ -301,18 +320,8 @@ app.use(async (req, res, next) => {
             risk = 0.5 + botRisk;
             type = (modules.bot && botRisk > 0.4) ? "Automated Bot/Script" : "Normal";
 
-            try {
-                // Adjust ML URL for production/local
-                let mlUrl = "http://localhost:8000/score";
-                if (process.env.VERCEL_URL) mlUrl = `https://${process.env.VERCEL_URL}/score`;
-                if (process.env.ML_API_URL) mlUrl = process.env.ML_API_URL;
-
-                const mlRes = await axios.post(mlUrl, { features }, { timeout: 2000 });
-                risk = (mlRes.data.risk + botRisk) / 1.5;
-            } catch (err) {
-                // heuristic fallback
-                risk = (features[1] * 2 + (features[2] + features[3]) * 0.5 + features[5] * 0.1 + botRisk) / 3;
-            }
+            // Heuristic Discovery (ZoneAlarm Style Heuristic)
+            risk = (features[1] * 2 + (features[2] + features[3]) * 0.5 + features[5] * 0.1 + botRisk) / 3;
 
             const payload = req.url + (req.body && Object.keys(req.body).length ? JSON.stringify(req.body) : "");
             const decodedPayload = decodeURIComponent(payload);
@@ -343,6 +352,8 @@ app.use(async (req, res, next) => {
             }
         }
 
+
+
         // 7. Log results (await to ensure persistence in serverless)
         await logRequest({
             ip: cleanIp, country, url: req.url, method: req.method,
@@ -356,6 +367,14 @@ app.use(async (req, res, next) => {
         if (status === "Blocked") {
             const incidentId = Math.random().toString(36).substring(7).toUpperCase();
             console.log(`🚨 BLOCKING: ${type} from ${cleanIp} (Incident: ${incidentId})`);
+
+            if (config.protectionMode === 'stealth') {
+                console.log("👻 STEALTH MODE: Dropping connection silently.");
+                // Important difference: We log it as "Blocked" but technically it's "Dropped"
+                // destroy() kills the TCP socket. The client gets ERR_CONNECTION_RESET or timeout.
+                return req.destroy();
+            }
+
             return res.status(403).send(getBlockPage(cleanIp, type, incidentId));
         }
 
@@ -378,10 +397,17 @@ app.use('/', limiter, (req, res, next) => {
         if (fs.existsSync(CONFIG_FILE)) config = JSON.parse(fs.readFileSync(CONFIG_FILE));
     } catch (e) { }
 
-    const dynamicTarget = config.targetUrl || TARGET_URL;
+    const dynamicTarget = config.targetUrl; // Trust the config file explicit value
+
+    if (!dynamicTarget) {
+        // Only if config is broken/missing, fallback to sensible default for safety
+        // But for proxy middleware we probably need strictly valid URL. 
+        // If user cleared it, we might error out or show a "Not Configured" page.
+        // For now, let's just default to internal app if absolutely nothing provided.
+    }
 
     createProxyMiddleware({
-        target: dynamicTarget,
+        target: dynamicTarget || TARGET_URL, // Fallback purely for startup safety
         changeOrigin: true,
         secure: false, // For local self-signed certs
         ws: true, // Support WebSockets
@@ -407,6 +433,9 @@ app.use('/', limiter, (req, res, next) => {
             }
         },
         onProxyReq: (proxyReq, req, res) => {
+            // Disable compression so we can inject content safely
+            proxyReq.removeHeader('accept-encoding');
+
             proxyReq.setHeader('X-Protected-By', 'AEGIS-Shield-v3');
             proxyReq.setHeader('X-Real-IP', req.ip);
             // Ensure host header matches target for external sites
@@ -506,14 +535,8 @@ app.get('/api/config', async (req, res) => {
 app.post('/api/config', async (req, res) => {
     try {
         const newConfig = req.body;
-        // Handle blacklist additions via config sync (if sent)
-        if (newConfig.blacklist && Array.isArray(newConfig.blacklist) && MONGODB_URI) {
-            // This is a simplified approach; ideally we have a separate endpoint for adding IPs
-            // For now, we update local file OR assume UI calls separate logic.
-            // The UI calls /config for updating simple settings. 
-            // If blacklist is here, we might want to sync it.
-            // But let's keep config file as source of truth for settings
-        }
+        console.log("⚙️  Received Configuration Update:", JSON.stringify(newConfig));
+
         fs.writeFileSync(CONFIG_FILE, JSON.stringify(newConfig, null, 2));
 
         // If there's blacklist in body and we have DB, sync it
@@ -523,8 +546,11 @@ app.post('/api/config', async (req, res) => {
             }
         }
 
-        res.json({ success: true });
-    } catch (e) { res.status(500).send("Write Error"); }
+        res.json({ success: true, message: "Configuration saved to disk" });
+    } catch (e) {
+        console.error("Config Save Error:", e);
+        res.status(500).send("Write Error");
+    }
 });
 
 app.post('/api/unblock', async (req, res) => {
@@ -545,6 +571,8 @@ app.post('/api/unblock', async (req, res) => {
     } catch (e) { res.status(500).send("Write Error"); }
 });
 
+
+
 app.get('/health', (req, res) => res.json({ status: 'active', version: '3.1.0-PROD', environment: IS_VERCEL ? 'Vercel Serverless' : 'Hosted' }));
 
 // Only listen if not in serverless mode (Vercel exports the app)
@@ -556,5 +584,7 @@ if (require.main === module) {
         console.log(`🎯 Target Application: ${TARGET_URL}\n`);
     });
 }
+
+
 
 module.exports = app;

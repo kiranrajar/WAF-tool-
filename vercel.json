@@ -5,10 +5,6 @@
             "destination": "/api"
         },
         {
-            "source": "/score",
-            "destination": "/ml/api.py"
-        },
-        {
             "source": "/health",
             "destination": "/api"
         }

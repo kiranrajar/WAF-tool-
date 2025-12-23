@@ -1,34 +1,12 @@
-# System Files
-.DS_Store
-Thumbs.db
-
-# Dependencies
-node_modules/
-venv/
-__pycache__/
-*.pyc
-
-# Environment & Secrets
+node_modules
 .env
-.env.local
-.env.production
-certs/
-
-# WAF Persistence Data (Ignore logs and blocked lists for clean push)
+*.log
 backend/logs.json
+backend/config.json
 backend/blacklist.json
 backend/reputation.json
-
-# IDE & Tooling
-.vscode/
-.idea/
-.gemini/
-.agent/
-*.log
-
-# Build Outputs
-dist/
-build/
-.next/
-out/
+ml/__pycache__
+ml/model.pkl
 .vercel
+dist
+build

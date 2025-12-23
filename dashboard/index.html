@@ -31,6 +31,7 @@
             <a href="#" data-tab="threat-tab">
                 Threat Intelligence
             </a>
+
             <a href="#" data-tab="settings-tab">
                 Engine Settings
             </a>
@@ -69,6 +70,8 @@
                         <label>Protection Mode:</label>
                         <select id="protection-mode" class="select-field">
                             <option value="blocking">🛡️ Blocking</option>
+                            <option value="stealth">👻 Stealth</option>
+                            <option value="lockdown">⛔ Lockdown</option>
                             <option value="learning">🎓 Learning</option>
                         </select>
                     </div>
@@ -259,6 +262,10 @@
             </div>
         </div>
 
+
+
+
+
         <!-- Settings Tab -->
         <div id="settings-tab" class="tab-content">
             <header>
@@ -299,6 +306,8 @@
                             <select id="cfg-mode"
                                 style="width: 100%; padding: 0.75rem; background: var(--bg-main); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;">
                                 <option value="blocking">🛡️ Blocking (Active Defense)</option>
+                                <option value="stealth">👻 Stealth (Silent Drop)</option>
+                                <option value="lockdown">⛔ Lockdown (Block All)</option>
                                 <option value="learning">👀 Learning (Log Only)</option>
                             </select>
                         </div>
@@ -376,6 +385,15 @@
                         style="background: rgba(210, 153, 34, 0.2); border: 1px solid #d29922; color: #d29922;">🤖 ML
                         Anomaly</button>
                     <button class="sim-btn btn-success" data-type="normal">✅ Normal Traffic</button>
+                </div>
+                <hr style="border: 0; border-top: 1px solid var(--border); margin: 1.5rem 0;">
+                <div style="text-align: center;">
+                    <button class="sim-btn btn-danger" id="carpet-bomb-btn"
+                        style="width: 100%; background: #da3633; color: white;">
+                        🔥 RED TEAM: CARPET BOMB (50 Attacks)
+                    </button>
+                    <p style="margin-top: 10px; font-size: 0.8em; color: var(--text-secondary);">Simulates a
+                        high-intensity heuristic scan to test Reputation & Auto-Ban logic.</p>
                 </div>
             </div>
         </div>
