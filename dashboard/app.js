@@ -246,7 +246,8 @@ function updateUI(logs, stats, syncInputs) {
 
     // Table
     const tbody = document.getElementById('log-body');
-    const recent = [...logs].slice(0, 12);
+    // Ensure chronological order even if network packets are out of order
+    const recent = [...logs].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 12);
     tbody.innerHTML = recent.map(log => {
         const url = log.url || '/';
         const displayUrl = url.length > 25 ? url.substring(0, 22) + '...' : url;

@@ -219,7 +219,11 @@ function getFingerprintRisk(req) {
 async function logRequest(logData) {
     try {
         if (MONGODB_URI) {
-            await Log.create({ time: new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Karachi' }), ...logData });
+            await Log.create({
+                time: new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Karachi' }),
+                timestamp: Date.now(),
+                ...logData
+            });
         } else {
             // Re-read file to ensure we have latest data (in case of concurrent lambdas, though loose consistency)
             let logs = [];
@@ -237,8 +241,10 @@ async function logRequest(logData) {
 
 // Core WAF Engine (Global Inspection)
 app.use(async (req, res, next) => {
-    // 0. Skip WAF for internal paths (Dashboard, API, Health)
-    if (req.url.startsWith('/api/') || req.url.startsWith('/dashboard') || req.url === '/health' || req.url.includes('.js') || req.url.includes('.css')) {
+    const internalPaths = ['/api/stats', '/api/logs', '/api/config', '/api/unblock', '/health'];
+    const isStatic = req.url.includes('.js') || req.url.includes('.css') || req.url.includes('.png') || req.url.includes('.jpg');
+
+    if (internalPaths.some(path => req.url.startsWith(path)) || req.url.startsWith('/dashboard') || isStatic) {
         return next();
     }
 
