@@ -25,6 +25,10 @@
             "dest": "ml/api.py"
         },
         {
+            "src": "/",
+            "dest": "dashboard/index.html"
+        },
+        {
             "src": "/(.*)",
             "dest": "dashboard/$1"
         }

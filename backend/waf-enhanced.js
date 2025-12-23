@@ -49,22 +49,29 @@ if (MONGODB_URI) {
         .catch(err => console.error('❌ MongoDB Connection Error:', err));
 }
 
-const LOG_FILE = path.join(__dirname, 'logs.json');
-const BLACKLIST_FILE = path.join(__dirname, 'blacklist.json');
-const CONFIG_FILE = path.join(__dirname, 'config.json');
+// Environment adaptation for Vercel (Read-Only FS)
+const IS_VERCEL = process.env.VERCEL || process.env.vercel;
+const DATA_DIR = IS_VERCEL ? '/tmp' : __dirname;
 
-// Initialize files if not exists
-if (!fs.existsSync(LOG_FILE)) fs.writeFileSync(LOG_FILE, JSON.stringify([]));
-if (!fs.existsSync(BLACKLIST_FILE)) fs.writeFileSync(BLACKLIST_FILE, JSON.stringify([]));
-if (!fs.existsSync(CONFIG_FILE)) {
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify({
-        blockedCountries: ['CN', 'RU', 'KP'],
-        rateLimit: 100,
-        riskThreshold: 0.88,
-        protectionMode: 'blocking',
-        targetUrl: 'http://localhost:5000'
-    }));
+const LOG_FILE = path.join(DATA_DIR, 'logs.json');
+const BLACKLIST_FILE = path.join(DATA_DIR, 'blacklist.json');
+const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
+
+// Initialize files if not exists (or copy to /tmp in Vercel)
+function initDataFiles() {
+    if (!fs.existsSync(LOG_FILE)) fs.writeFileSync(LOG_FILE, JSON.stringify([]));
+    if (!fs.existsSync(BLACKLIST_FILE)) fs.writeFileSync(BLACKLIST_FILE, JSON.stringify([]));
+    if (!fs.existsSync(CONFIG_FILE)) {
+        fs.writeFileSync(CONFIG_FILE, JSON.stringify({
+            blockedCountries: ['CN', 'RU', 'KP'],
+            rateLimit: 100,
+            riskThreshold: 0.88,
+            protectionMode: 'blocking',
+            targetUrl: 'http://localhost:5000'
+        }));
+    }
 }
+initDataFiles();
 
 app.use(cors());
 app.use(useragent.express());
@@ -75,8 +82,13 @@ app.use(bodyParser.urlencoded({ extended: true }));
 const limiter = rateLimit({
     windowMs: 1 * 60 * 1000, // 1 minute
     max: (req) => {
-        const config = JSON.parse(fs.readFileSync(CONFIG_FILE));
-        return config.rateLimit || 100;
+        try {
+            if (fs.existsSync(CONFIG_FILE)) {
+                const config = JSON.parse(fs.readFileSync(CONFIG_FILE));
+                return config.rateLimit || 100;
+            }
+        } catch (e) { }
+        return 100;
     },
     message: { error: "Too many requests. AEGIS DDoS Protection active." },
     standardHeaders: true,
@@ -184,7 +196,11 @@ async function logRequest(logData) {
         if (MONGODB_URI) {
             await Log.create({ time: new Date().toLocaleTimeString(), ...logData });
         } else {
-            const logs = JSON.parse(fs.readFileSync(LOG_FILE));
+            // Re-read file to ensure we have latest data (in case of concurrent lambdas, though loose consistency)
+            let logs = [];
+            if (fs.existsSync(LOG_FILE)) {
+                logs = JSON.parse(fs.readFileSync(LOG_FILE));
+            }
             logs.push({ time: new Date().toLocaleTimeString(), timestamp: Date.now(), ...logData });
             if (logs.length > 500) logs.shift();
             fs.writeFileSync(LOG_FILE, JSON.stringify(logs, null, 2));
@@ -196,11 +212,20 @@ async function logRequest(logData) {
 
 // Core WAF Engine (Global Inspection)
 app.use(async (req, res, next) => {
+    // Initialize data files if missing (crucial for serverless cold starts)
+    initDataFiles();
+
     // 1. Basic Setup
     const startTime = Date.now();
-    const ip = req.ip.replace('::ffff:', '').replace('127.0.0.1', '8.8.8.8').replace('::1', '8.8.8.8'); // Local dev override for GeoIP
-    const config = JSON.parse(fs.readFileSync(CONFIG_FILE));
-    const geo = geoip.lookup(ip);
+    const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || req.ip;
+    const cleanIp = ip.replace('::ffff:', '').replace('127.0.0.1', '8.8.8.8').replace('::1', '8.8.8.8');
+
+    let config = { blockedCountries: [], riskThreshold: 0.88, protectionMode: 'blocking' };
+    try {
+        if (fs.existsSync(CONFIG_FILE)) config = JSON.parse(fs.readFileSync(CONFIG_FILE));
+    } catch (e) { }
+
+    const geo = geoip.lookup(cleanIp);
     const country = geo ? geo.country : 'XX';
 
     // 2. Internal Route Check
@@ -221,17 +246,17 @@ app.use(async (req, res, next) => {
             risk = 1.0;
 
             const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
-            if (!blacklist.find(b => b.ip === ip)) {
-                blacklist.push({ ip, reason: `WAF Honeypot: ${req.url}`, timestamp: Date.now() });
+            if (!blacklist.find(b => b.ip === cleanIp)) {
+                blacklist.push({ ip: cleanIp, reason: `WAF Honeypot: ${req.url}`, timestamp: Date.now() });
                 fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(blacklist, null, 2));
             }
-            sendSOCAlert({ type, ip, country, risk, payload: req.url });
+            sendSOCAlert({ type, ip: cleanIp, country, risk, payload: req.url });
         }
 
         // 4. Global Blacklist Check
         if (status === "Allowed") {
             const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
-            if (blacklist.some(b => b.ip === ip)) {
+            if (blacklist.some(b => b.ip === cleanIp)) {
                 status = "Blocked";
                 type = "Blacklisted IP";
                 risk = 1.0;
@@ -253,13 +278,19 @@ app.use(async (req, res, next) => {
             type = botRisk > 0.4 ? "Automated Bot/Script" : "Normal";
 
             try {
-                const mlRes = await axios.post("http://localhost:8000/score", { features }, { timeout: 2000 });
+                // Adjust ML URL for production/local
+                let mlUrl = "http://localhost:8000/score";
+                if (process.env.VERCEL_URL) mlUrl = `https://${process.env.VERCEL_URL}/score`;
+                if (process.env.ML_API_URL) mlUrl = process.env.ML_API_URL;
+
+                const mlRes = await axios.post(mlUrl, { features }, { timeout: 2000 });
                 risk = (mlRes.data.risk + botRisk) / 1.5;
             } catch (err) {
+                // heuristic fallback
                 risk = (features[1] * 2 + (features[2] + features[3]) * 0.5 + features[5] * 0.1 + botRisk) / 3;
             }
 
-            const payload = req.url + JSON.stringify(req.body);
+            const payload = req.url + (req.body && Object.keys(req.body).length ? JSON.stringify(req.body) : "");
             const decodedPayload = decodeURIComponent(payload);
             const detectedType = Object.keys(SIGNATURES).find(cat =>
                 SIGNATURES[cat].some(p => p.test(decodedPayload))
@@ -273,24 +304,25 @@ app.use(async (req, res, next) => {
             if ((risk > config.riskThreshold || detectedType) && config.protectionMode === 'blocking') {
                 status = "Blocked";
                 if (!detectedType) type = "ML Anomaly Detection"; // Differentiate ML blocks from signatures
-                console.log(`🚨 BLOCKING: ${type} from ${ip} (Risk: ${risk.toFixed(3)})`);
-                sendSOCAlert({ type, ip, country, risk, payload: payload.substring(0, 100) });
+                console.log(`🚨 BLOCKING: ${type} from ${cleanIp} (Risk: ${risk.toFixed(3)})`);
+                sendSOCAlert({ type, ip: cleanIp, country, risk, payload: payload.substring(0, 100) });
             }
         }
 
         // 7. Log results
         logRequest({
-            ip, country, url: req.url, method: req.method,
+            ip: cleanIp, country, url: req.url, method: req.method,
             userAgent: req.useragent.browser || 'Unknown',
             risk: parseFloat(risk.toFixed(3)), status, type,
             responseTime: Date.now() - startTime,
-            isBot: req.useragent.isBot
+            isBot: req.useragent.isBot,
+            payload: (req.method === 'POST' || req.method === 'PUT') ? JSON.stringify(req.body) : req.query && Object.keys(req.query).length ? JSON.stringify(req.query) : ''
         });
 
         if (status === "Blocked") {
             const incidentId = Math.random().toString(36).substring(7).toUpperCase();
-            console.log(`🚨 BLOCKING: ${type} from ${ip} (Incident: ${incidentId})`);
-            return res.status(403).send(getBlockPage(ip, type, incidentId));
+            console.log(`🚨 BLOCKING: ${type} from ${cleanIp} (Incident: ${incidentId})`);
+            return res.status(403).send(getBlockPage(cleanIp, type, incidentId));
         }
 
         next();
@@ -307,7 +339,11 @@ app.use('/', limiter, (req, res, next) => {
         return next();
     }
 
-    const config = JSON.parse(fs.readFileSync(CONFIG_FILE));
+    let config = {};
+    try {
+        if (fs.existsSync(CONFIG_FILE)) config = JSON.parse(fs.readFileSync(CONFIG_FILE));
+    } catch (e) { }
+
     const dynamicTarget = config.targetUrl || TARGET_URL;
 
     createProxyMiddleware({
@@ -361,6 +397,7 @@ app.use('/', limiter, (req, res, next) => {
 // Admin API
 app.get('/api/stats', (req, res) => {
     try {
+        initDataFiles(); // Ensure files exist
         const logs = JSON.parse(fs.readFileSync(LOG_FILE, 'utf8'));
         const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE, 'utf8'));
         const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
@@ -388,12 +425,14 @@ app.get('/api/stats', (req, res) => {
             config
         });
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: "Failed to read data" });
     }
 });
 
 app.get('/api/logs', (req, res) => {
     try {
+        initDataFiles();
         const logs = JSON.parse(fs.readFileSync(LOG_FILE, 'utf8'));
         res.json(logs.reverse().slice(0, 50));
     } catch (err) {
@@ -402,30 +441,42 @@ app.get('/api/logs', (req, res) => {
 });
 
 app.get('/api/config', (req, res) => {
-    const config = JSON.parse(fs.readFileSync(CONFIG_FILE));
-    const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
-    res.json({ ...config, blacklist: blacklist.map(b => b.ip) });
+    try {
+        initDataFiles();
+        const config = JSON.parse(fs.readFileSync(CONFIG_FILE));
+        const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
+        res.json({ ...config, blacklist: blacklist.map(b => b.ip) });
+    } catch (e) { res.status(500).send("Config Error"); }
 });
 
 app.post('/api/config', (req, res) => {
-    const newConfig = req.body;
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(newConfig, null, 2));
-    res.json({ success: true });
+    try {
+        const newConfig = req.body;
+        fs.writeFileSync(CONFIG_FILE, JSON.stringify(newConfig, null, 2));
+        res.json({ success: true });
+    } catch (e) { res.status(500).send("Write Error"); }
 });
 
 app.post('/api/unblock', (req, res) => {
-    const { ip } = req.body;
-    const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
-    const filtered = blacklist.filter(b => b.ip !== ip);
-    fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(filtered, null, 2));
-    res.json({ success: true });
+    try {
+        const { ip } = req.body;
+        const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
+        const filtered = blacklist.filter(b => b.ip !== ip);
+        fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(filtered, null, 2));
+        res.json({ success: true });
+    } catch (e) { res.status(500).send("Write Error"); }
 });
 
-app.get('/health', (req, res) => res.json({ status: 'active', version: '3.1.0-PROD' }));
+app.get('/health', (req, res) => res.json({ status: 'active', version: '3.1.0-PROD', environment: IS_VERCEL ? 'Vercel Serverless' : 'Hosted' }));
 
-app.listen(PORT, () => {
-    console.log(`\n🛡️  AEGIS SHIELD v3.1 PROFESSIONAL WAF STARTED`);
-    console.log(`🌐 Proxy Listening:    http://localhost:${PORT}`);
-    console.log(`📊 Security Dashboard: http://localhost:${PORT}/dashboard`);
-    console.log(`🎯 Target Application: ${TARGET_URL}\n`);
-});
+// Only listen if not in serverless mode (Vercel exports the app)
+if (require.main === module) {
+    app.listen(PORT, () => {
+        console.log(`\n🛡️  AEGIS SHIELD v3.1 PROFESSIONAL WAF STARTED`);
+        console.log(`🌐 Proxy Listening:    http://localhost:${PORT}`);
+        console.log(`📊 Security Dashboard: http://localhost:${PORT}/dashboard`);
+        console.log(`🎯 Target Application: ${TARGET_URL}\n`);
+    });
+}
+
+module.exports = app;

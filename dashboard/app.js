@@ -72,11 +72,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 xss: "/search?q=<script>alert(1)</script>",
                 traversal: "/file?path=../../etc/passwd",
                 rce: "/cmd?exec=rm -rf /",
+                anomaly: "/api/check?token=$$$$$$$$$$$$$$$$^^^^^^^^^^^^^^^^^^^^@@@@@@@@@@",
                 normal: "/"
             };
 
             showToast(`🚀 Sending ${type.toUpperCase()} request...`);
-            fetch(`http://localhost:3000${targets[type] || '/'}`);
+            // Use relative path so it hits the same origin (works for Vercel & Proxy)
+            fetch(targets[type] || '/');
             modal.classList.remove('active');
         });
     });
@@ -158,6 +160,7 @@ function updateUI(logs, stats) {
             <td>${log.ip}</td>
             <td><span style="font-size: 1.2rem; margin-right: 5px;">${getFlag(log.country)}</span> ${log.country}</td>
             <td title="${log.url}">${log.url.substring(0, 25)}${log.url.length > 25 ? '...' : ''}</td>
+            <td title="${log.payload || ''}" style="font-family: monospace; font-size: 0.85em; color: var(--text-muted);">${(log.payload || '-').substring(0, 30)}${(log.payload || '').length > 30 ? '...' : ''}</td>
             <td>
                 <span class="fingerprint-tag ${log.isBot ? 'tag-bot' : 'tag-human'}">
                     ${log.isBot ? (log.botInfo || 'Automated') : 'Browser'}
