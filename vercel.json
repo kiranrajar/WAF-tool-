@@ -1,8 +1,4 @@
 {
-    "version": 2,
-    "buildCommand": "cd backend && npm install",
-    "cleanUrls": true,
-    "trailingSlash": false,
     "rewrites": [
         {
             "source": "/api/:path*",
@@ -15,21 +11,6 @@
         {
             "source": "/health",
             "destination": "/api"
-        },
-        {
-            "source": "/",
-            "destination": "/dashboard/index.html"
-        }
-    ],
-    "headers": [
-        {
-            "source": "/dashboard/:path*",
-            "headers": [
-                {
-                    "key": "Cache-Control",
-                    "value": "public, max-age=0, must-revalidate"
-                }
-            ]
         }
     ],
     "functions": {

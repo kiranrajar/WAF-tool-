@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AEGIS Shield | AI-Powered Security Platform</title>
+    <link rel="stylesheet" href="style.css?v=3.0.0">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@500&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <aside class="sidebar">
+        <div class="logo-container">
+            <div class="logo-icon">AE</div>
+            <div class="logo-text-wrapper">
+                <span class="logo-text">AEGIS SHIELD</span>
+                <span class="logo-subtitle">Enterprise Security</span>
+            </div>
+        </div>
+        <nav id="sidebar-nav">
+            <a href="#" data-tab="dashboard-tab" class="active">
+                Overview
+            </a>
+            <a href="#" data-tab="firewall-tab">
+                Security Policies
+            </a>
+            <a href="#" data-tab="threat-tab">
+                Threat Intelligence
+            </a>
+            <a href="#" data-tab="settings-tab">
+                Engine Settings
+            </a>
+        </nav>
+        <div class="status-panel">
+            <div class="status-header">
+                <span>Protection Status</span>
+                <span class="status-badge">ACTIVE</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill"></div>
+            </div>
+            <div class="status-info">
+                <div class="info-item">
+                    <span class="info-label">Uptime</span>
+                    <span class="info-value" id="uptime">99.9%</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Engine</span>
+                    <span class="info-value">ML v2.5</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="main-wrapper">
+        <!-- Dashboard Tab -->
+        <div id="dashboard-tab" class="tab-content active">
+            <header>
+                <div class="header-meta">
+                    <h1>Security Operations Center</h1>
+                    <p>Real-time anomaly detection and traffic analysis</p>
+                </div>
+                <div class="controls-panel">
+                    <div class="mode-toggle">
+                        <label>Protection Mode:</label>
+                        <select id="protection-mode" class="select-field">
+                            <option value="blocking">🛡️ Blocking</option>
+                            <option value="learning">🎓 Learning</option>
+                        </select>
+                    </div>
+                    <button id="refresh-data" class="btn">
+                        Force Refresh
+                    </button>
+                    <button id="open-sim" class="btn btn-outline" style="opacity: 0.5;">
+                        Attack Simulator
+                    </button>
+                </div>
+            </header>
+
+            <section class="stat-row">
+                <div class="stat-card">
+                    <div class="card-label">Total Requests</div>
+                    <div id="stat-total" class="card-value">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="card-label">Threats Blocked</div>
+                    <div id="stat-blocked" class="card-value">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="card-label">Avg Risk Score</div>
+                    <div id="stat-risk" class="card-value">0.0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="card-label">Blocked Addresses</div>
+                    <div id="stat-bans" class="card-value">0</div>
+                </div>
+            </section>
+
+            <section class="dashboard-grid">
+                <!-- Map Section Removed as per request -->
+                <!-- Move Attack Distribution here if needed or keep it separate -->
+            </section>
+
+            <section class="dashboard-grid">
+                <div class="card chart-card">
+                    <h3>Threat Velocity (Last 24h)</h3>
+                    <canvas id="velocityChart"></canvas>
+                </div>
+                <div class="card chart-card">
+                    <h3>Attack Distribution</h3>
+                    <canvas id="vectorChart"></canvas>
+                </div>
+            </section>
+
+            <section class="data-table-container">
+                <div class="table-header">
+                    <h3>Live Traffic Monitor</h3>
+                    <div class="live-indicator">
+                        <div class="pulse-dot"></div>
+                        <span>Live Feed</span>
+                    </div>
+                </div>
+                <div class="table-scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Source IP</th>
+                                <th>Region</th>
+                                <th>Endpoint</th>
+                                <th>Payload</th>
+                                <th>Fingerprint</th>
+                                <th>Classification</th>
+                                <th>Risk</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="log-body"></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- Firewall Tab -->
+        <div id="firewall-tab" class="tab-content">
+            <header>
+                <div class="header-meta">
+                    <h1>Firewall Control Center</h1>
+                    <p>Manage access policies and IP reputation</p>
+                </div>
+            </header>
+            <div class="firewall-manager">
+                <div class="card firewall-card">
+                    <h3>IP Blacklist</h3>
+                    <p class="card-description">Permanently blocked addresses</p>
+                    <div class="ip-list" id="blacklist-view"></div>
+                    <div class="input-group">
+                        <input type="text" id="add-ip-field" placeholder="Enter IP address (e.g. 192.168.1.100)">
+                        <button id="btn-add-ip" class="btn btn-primary">Add to Blacklist</button>
+                    </div>
+                </div>
+                <div class="card firewall-card">
+                    <h3>Policy Configuration</h3>
+                    <div class="settings-form">
+                        <div class="form-item">
+                            <label>Protected Application (Target URL)</label>
+                            <input type="text" id="cfg-target" placeholder="http://localhost:5000">
+                        </div>
+                        <div class="form-item">
+                            <label>Rate Limit (Req/Min)</label>
+                            <input type="number" id="cfg-rate-limit" value="100">
+                        </div>
+                        <div class="form-item">
+                            <label>Risk Threshold (%)</label>
+                            <input type="number" id="cfg-threshold" value="88">
+                        </div>
+                        <div class="form-item">
+                            <label>Geo-Blocked Countries (ISO)</label>
+                            <input type="text" id="cfg-geo" placeholder="CN, RU, KP">
+                        </div>
+                        <button id="save-config" class="btn btn-block" style="margin-top: 15px;">Save Security
+                            Policy</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Threat Intelligence Tab -->
+        <div id="threat-tab" class="tab-content">
+            <header>
+                <div class="header-meta">
+                    <h1>Threat Intelligence Hub</h1>
+                    <p>Advanced analytics and attack pattern recognition</p>
+                </div>
+            </header>
+            <div class="threat-grid">
+                <div class="card threat-card">
+                    <h3>Top Attack Vectors</h3>
+                    <div class="threat-list" id="top-threats">
+                        <div class="threat-item">
+                            <div class="threat-info">
+                                <span class="threat-name">SQL Injection</span>
+                            </div>
+                            <div class="threat-stats">
+                                <span class="threat-count" id="sqli-count">0</span>
+                                <div class="threat-bar">
+                                    <div class="threat-bar-fill" id="sqli-bar"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="threat-item">
+                            <div class="threat-info">
+                                <span class="threat-name">XSS Attacks</span>
+                            </div>
+                            <div class="threat-stats">
+                                <span class="threat-count" id="xss-count">0</span>
+                                <div class="threat-bar">
+                                    <div class="threat-bar-fill" id="xss-bar"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="threat-item">
+                            <div class="threat-info">
+                                <span class="threat-name">Path Traversal</span>
+                            </div>
+                            <div class="threat-stats">
+                                <span class="threat-count" id="path-count">0</span>
+                                <div class="threat-bar">
+                                    <div class="threat-bar-fill" id="path-bar"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="threat-item">
+                            <div class="threat-info">
+                                <span class="threat-name">WebShell/RCE</span>
+                            </div>
+                            <div class="threat-stats">
+                                <span class="threat-count" id="rce-count">0</span>
+                                <div class="threat-bar">
+                                    <div class="threat-bar-fill" id="rce-bar"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>Geographic Risk Assessment</h3>
+                    <div class="geo-map-container">
+                        <div id="geo-heatmap" class="heatmap-placeholder">
+                            <div class="heatmap-overlay">Real-time Threat Cluster Analysis Active</div>
+                        </div>
+                    </div>
+                    <div class="geo-stats" id="geo-stats">
+                        <!-- Countries will be injected here -->
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <h3>Incident Discovery Timeline</h3>
+                <div class="timeline-stats">
+                    <div class="timeline-item">
+                        <span class="timeline-label">Last Hour</span>
+                        <span class="timeline-value" id="attacks-hour">0</span>
+                    </div>
+                    <div class="timeline-item">
+                        <span class="timeline-label">Last 24 Hours</span>
+                        <span class="timeline-value" id="attacks-day">0</span>
+                    </div>
+                    <div class="timeline-item">
+                        <span class="timeline-label">Peak Attack Time</span>
+                        <span class="timeline-value" id="peak-time">--:--</span>
+                    </div>
+                    <div class="timeline-item">
+                        <span class="timeline-label">Avg Response Time</span>
+                        <span class="timeline-value">0.8ms</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings-tab" class="tab-content">
+            <header>
+                <div class="header-meta">
+                    <h1>Engine Configuration</h1>
+                    <p>Advanced security engine and ML model parameters</p>
+                </div>
+            </header>
+            <div class="settings-grid">
+                <div class="card">
+                    <h3>Machine Learning Parameters</h3>
+                    <div class="settings-list">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <span class="setting-label">Model Version</span>
+                                <span class="setting-desc">Isolation Forest v2.5</span>
+                            </div>
+                            <span class="setting-value">Active</span>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <span class="setting-label">Contamination Rate</span>
+                                <span class="setting-desc">Anomaly detection sensitivity</span>
+                            </div>
+                            <span class="setting-value">10%</span>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <span class="setting-label">Feature Vector Size</span>
+                                <span class="setting-desc">Input dimensions for ML model</span>
+                            </div>
+                            <span class="setting-value">6 features</span>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <span class="setting-label">Training Dataset</span>
+                                <span class="setting-desc">Synthetic attack samples</span>
+                            </div>
+                            <span class="setting-value">2000+ samples</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>Detection Parameters</h3>
+                    <div class="settings-list">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <span class="setting-label">Risk Threshold</span>
+                                <span class="setting-desc">Auto-block trigger point</span>
+                            </div>
+                            <span class="setting-value danger-text">88%</span>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <span class="setting-label">Signature Database</span>
+                                <span class="setting-desc">Known attack patterns</span>
+                            </div>
+                            <span class="setting-value">4 categories</span>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <span class="setting-label">Entropy Analysis</span>
+                                <span class="setting-desc">Payload randomness detection</span>
+                            </div>
+                            <span class="setting-value success-text">Enabled</span>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <span class="setting-label">URL Decoding</span>
+                                <span class="setting-desc">Bypass prevention</span>
+                            </div>
+                            <span class="setting-value success-text">Active</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <h3>System Logs</h3>
+                <div class="log-viewer">
+                    <div class="log-entry">[INFO] AEGIS Shield initialized successfully</div>
+                    <div class="log-entry">[INFO] ML Engine loaded: model.pkl (860KB)</div>
+                    <div class="log-entry">[INFO] Signature database: 4 threat categories active</div>
+                    <div class="log-entry">[INFO] Rate limiting: 15 requests/minute</div>
+                    <div class="log-entry">[INFO] Reputation system: Active</div>
+                    <div class="log-entry success-log">[SUCCESS] All protection layers operational</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="sim-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Security Lab: Attack Simulator</h3>
+                <button id="close-sim" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Test your security policies by triggering controlled attack vectors.</p>
+                <div class="sim-grid">
+                    <button class="sim-btn" data-type="sqli">💉 SQL Injection</button>
+                    <button class="sim-btn" data-type="xss">📜 Cross-Site Scripting</button>
+                    <button class="sim-btn" data-type="traversal">📂 Path Traversal</button>
+                    <button class="sim-btn" data-type="rce">💻 Remote Code Execution</button>
+                    <button class="sim-btn warning-btn" data-type="anomaly"
+                        style="background: rgba(210, 153, 34, 0.2); border: 1px solid #d29922; color: #d29922;">🤖 ML
+                        Anomaly</button>
+                    <button class="sim-btn btn-success" data-type="normal">✅ Normal Traffic</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-area"></div>
+    <script src="app.js?v=3.1.0"></script>
+</body>
+
+</html>
