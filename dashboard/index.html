@@ -224,148 +224,158 @@
                                     <div class="threat-bar-fill" id="rce-bar"></div>
                                 </div>
                             </div>
+                            <div class="threat-item">
+                                <div class="threat-info">
+                                    <span class="threat-name">ML Anomaly Detection</span>
+                                </div>
+                                <div class="threat-stats">
+                                    <span class="threat-count" id="anomaly-count">0</span>
+                                    <div class="threat-bar">
+                                        <div class="threat-bar-fill" id="anomaly-bar"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h3>Geographic Risk Assessment</h3>
+                        <div class="geo-map-container">
+                            <div id="geo-heatmap" class="heatmap-placeholder">
+                                <div class="heatmap-overlay">Real-time Threat Cluster Analysis Active</div>
+                            </div>
+                        </div>
+                        <div class="geo-stats" id="geo-stats">
+                            <!-- Countries will be injected here -->
                         </div>
                     </div>
                 </div>
                 <div class="card">
-                    <h3>Geographic Risk Assessment</h3>
-                    <div class="geo-map-container">
-                        <div id="geo-heatmap" class="heatmap-placeholder">
-                            <div class="heatmap-overlay">Real-time Threat Cluster Analysis Active</div>
+                    <h3>Incident Discovery Timeline</h3>
+                    <div class="timeline-stats">
+                        <div class="timeline-item">
+                            <span class="timeline-label">Last Hour</span>
+                            <span class="timeline-value" id="attacks-hour">0</span>
                         </div>
-                    </div>
-                    <div class="geo-stats" id="geo-stats">
-                        <!-- Countries will be injected here -->
-                    </div>
-                </div>
-            </div>
-            <div class="card">
-                <h3>Incident Discovery Timeline</h3>
-                <div class="timeline-stats">
-                    <div class="timeline-item">
-                        <span class="timeline-label">Last Hour</span>
-                        <span class="timeline-value" id="attacks-hour">0</span>
-                    </div>
-                    <div class="timeline-item">
-                        <span class="timeline-label">Last 24 Hours</span>
-                        <span class="timeline-value" id="attacks-day">0</span>
-                    </div>
-                    <div class="timeline-item">
-                        <span class="timeline-label">Peak Attack Time</span>
-                        <span class="timeline-value" id="peak-time">--:--</span>
-                    </div>
-                    <div class="timeline-item">
-                        <span class="timeline-label">Avg Response Time</span>
-                        <span class="timeline-value">0.8ms</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-
-
-
-
-        <!-- Settings Tab -->
-        <div id="settings-tab" class="tab-content">
-            <header>
-                <div class="header-meta">
-                    <h1>Global Configuration</h1>
-                    <p>Manage application target, policies, and detection modules</p>
-                </div>
-            </header>
-            <div class="settings-grid">
-                <div class="card">
-                    <h3>Application Policy</h3>
-                    <div class="settings-form">
-                        <div class="form-item" style="margin-bottom: 1rem;">
-                            <label
-                                style="display:block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">Protected
-                                Application (Target URL)</label>
-                            <input type="text" id="cfg-target" placeholder="http://localhost:5000"
-                                style="width: 100%; padding: 0.75rem; background: var(--bg-main); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;">
+                        <div class="timeline-item">
+                            <span class="timeline-label">Last 24 Hours</span>
+                            <span class="timeline-value" id="attacks-day">0</span>
                         </div>
-                        <div class="form-item" style="margin-bottom: 1rem;">
-                            <label
-                                style="display:block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">Rate
-                                Limit (Req/Min)</label>
-                            <input type="number" id="cfg-rate-limit" value="100"
-                                style="width: 100%; padding: 0.75rem; background: var(--bg-main); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;">
+                        <div class="timeline-item">
+                            <span class="timeline-label">Peak Attack Time</span>
+                            <span class="timeline-value" id="peak-time">--:--</span>
                         </div>
-                        <div class="form-item" style="margin-bottom: 1rem;">
-                            <label
-                                style="display:block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">Risk
-                                Threshold (%)</label>
-                            <input type="number" id="cfg-threshold" value="88"
-                                style="width: 100%; padding: 0.75rem; background: var(--bg-main); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;">
-                        </div>
-                        <div class="form-item" style="margin-bottom: 1rem;">
-                            <label
-                                style="display:block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">Protection
-                                Mode</label>
-                            <select id="cfg-mode"
-                                style="width: 100%; padding: 0.75rem; background: var(--bg-main); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;">
-                                <option value="blocking">🛡️ Blocking (Active Defense)</option>
-                                <option value="stealth">👻 Stealth (Silent Drop)</option>
-                                <option value="lockdown">⛔ Lockdown (Block All)</option>
-                                <option value="learning">👀 Learning (Log Only)</option>
-                            </select>
-                        </div>
-                        <div class="form-item">
-                            <label
-                                style="display:block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">Geo-Blocked
-                                Countries (ISO)</label>
-                            <input type="text" id="cfg-geo" placeholder="CN, RU, KP"
-                                style="width: 100%; padding: 0.75rem; background: var(--bg-main); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;">
-                        </div>
-                    </div>
-                </div>
-                <div class="card">
-                    <h3>Security Modules</h3>
-                    <div class="settings-list">
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <span class="setting-label">SQL Injection</span>
-                                <span class="setting-desc">Detect SQLi payloads</span>
-                            </div>
-                            <input type="checkbox" id="mod-sqli" class="toggle-switch">
-                        </div>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <span class="setting-label">Cross-Site Scripting (XSS)</span>
-                                <span class="setting-desc">Detect script injection</span>
-                            </div>
-                            <input type="checkbox" id="mod-xss" class="toggle-switch">
-                        </div>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <span class="setting-label">Path Traversal</span>
-                                <span class="setting-desc">Detect file system access</span>
-                            </div>
-                            <input type="checkbox" id="mod-path" class="toggle-switch">
-                        </div>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <span class="setting-label">Command Injection (RCE)</span>
-                                <span class="setting-desc">Detect system commands</span>
-                            </div>
-                            <input type="checkbox" id="mod-rce" class="toggle-switch">
-                        </div>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <span class="setting-label">Bot Analysis</span>
-                                <span class="setting-desc">Detect automated scripts</span>
-                            </div>
-                            <input type="checkbox" id="mod-bot" class="toggle-switch">
+                        <div class="timeline-item">
+                            <span class="timeline-label">Avg Response Time</span>
+                            <span class="timeline-value">0.8ms</span>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="card" style="margin-top: 20px;">
-                <button id="save-config" class="btn btn-primary"
-                    style="width: 100%; justify-content: center; padding: 1rem;">Save System Configuration</button>
+
+
+
+
+
+            <!-- Settings Tab -->
+            <div id="settings-tab" class="tab-content">
+                <header>
+                    <div class="header-meta">
+                        <h1>Global Configuration</h1>
+                        <p>Manage application target, policies, and detection modules</p>
+                    </div>
+                </header>
+                <div class="settings-grid">
+                    <div class="card">
+                        <h3>Application Policy</h3>
+                        <div class="settings-form">
+                            <div class="form-item" style="margin-bottom: 1rem;">
+                                <label
+                                    style="display:block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">Protected
+                                    Application (Target URL)</label>
+                                <input type="text" id="cfg-target" placeholder="http://localhost:5000"
+                                    style="width: 100%; padding: 0.75rem; background: var(--bg-main); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;">
+                            </div>
+                            <div class="form-item" style="margin-bottom: 1rem;">
+                                <label
+                                    style="display:block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">Rate
+                                    Limit (Req/Min)</label>
+                                <input type="number" id="cfg-rate-limit" value="100"
+                                    style="width: 100%; padding: 0.75rem; background: var(--bg-main); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;">
+                            </div>
+                            <div class="form-item" style="margin-bottom: 1rem;">
+                                <label
+                                    style="display:block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">Risk
+                                    Threshold (%)</label>
+                                <input type="number" id="cfg-threshold" value="88"
+                                    style="width: 100%; padding: 0.75rem; background: var(--bg-main); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;">
+                            </div>
+                            <div class="form-item" style="margin-bottom: 1rem;">
+                                <label
+                                    style="display:block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">Protection
+                                    Mode</label>
+                                <select id="cfg-mode"
+                                    style="width: 100%; padding: 0.75rem; background: var(--bg-main); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;">
+                                    <option value="blocking">🛡️ Blocking (Active Defense)</option>
+                                    <option value="stealth">👻 Stealth (Silent Drop)</option>
+                                    <option value="lockdown">⛔ Lockdown (Block All)</option>
+                                    <option value="learning">👀 Learning (Log Only)</option>
+                                </select>
+                            </div>
+                            <div class="form-item">
+                                <label
+                                    style="display:block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">Geo-Blocked
+                                    Countries (ISO)</label>
+                                <input type="text" id="cfg-geo" placeholder="CN, RU, KP"
+                                    style="width: 100%; padding: 0.75rem; background: var(--bg-main); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h3>Security Modules</h3>
+                        <div class="settings-list">
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">SQL Injection</span>
+                                    <span class="setting-desc">Detect SQLi payloads</span>
+                                </div>
+                                <input type="checkbox" id="mod-sqli" class="toggle-switch">
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Cross-Site Scripting (XSS)</span>
+                                    <span class="setting-desc">Detect script injection</span>
+                                </div>
+                                <input type="checkbox" id="mod-xss" class="toggle-switch">
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Path Traversal</span>
+                                    <span class="setting-desc">Detect file system access</span>
+                                </div>
+                                <input type="checkbox" id="mod-path" class="toggle-switch">
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Command Injection (RCE)</span>
+                                    <span class="setting-desc">Detect system commands</span>
+                                </div>
+                                <input type="checkbox" id="mod-rce" class="toggle-switch">
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Bot Analysis</span>
+                                    <span class="setting-desc">Detect automated scripts</span>
+                                </div>
+                                <input type="checkbox" id="mod-bot" class="toggle-switch">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card" style="margin-top: 20px;">
+                    <button id="save-config" class="btn btn-primary"
+                        style="width: 100%; justify-content: center; padding: 1rem;">Save System Configuration</button>
+                </div>
             </div>
-        </div>
     </main>
 
     <div id="sim-modal" class="modal">

@@ -237,8 +237,13 @@ async function logRequest(logData) {
 
 // Core WAF Engine (Global Inspection)
 app.use(async (req, res, next) => {
-    // Initialize data files if missing (crucial for serverless cold starts)
-    initDataFiles();
+    // 0. Skip WAF for internal paths (Dashboard, API, Health)
+    if (req.url.startsWith('/api/') || req.url.startsWith('/dashboard') || req.url === '/health' || req.url.includes('.js') || req.url.includes('.css')) {
+        return next();
+    }
+
+    // Initialize data files if missing
+    await initDataFiles();
 
     // 1. Basic Setup
     const startTime = Date.now();
@@ -389,10 +394,10 @@ app.use(async (req, res, next) => {
             console.log(`🚨 BLOCKING: ${type} from ${cleanIp} (Incident: ${incidentId})`);
 
             if (config.protectionMode === 'stealth') {
-                console.log("👻 STEALTH MODE: Dropping connection silently.");
-                // Important difference: We log it as "Blocked" but technically it's "Dropped"
-                // destroy() kills the TCP socket. The client gets ERR_CONNECTION_RESET or timeout.
-                return req.destroy();
+                console.log("👻 STEALTH MODE: Killing TCP socket for hostiles.");
+                if (res.socket) res.socket.destroy();
+                else res.destroy();
+                return;
             }
 
             return res.status(403).send(getBlockPage(cleanIp, type, incidentId));
@@ -533,13 +538,13 @@ app.get('/api/stats', async (req, res) => {
 
 app.get('/api/logs', async (req, res) => {
     try {
-        if (MONGODB_URI) {
-            const logs = await Log.find().sort({ timestamp: -1 }).limit(50);
+        if (MONGODB_URI && mongoose.connection.readyState === 1) {
+            const logs = await Log.find().sort({ timestamp: -1 }).limit(50).lean();
             return res.json(logs);
         }
-        initDataFiles();
+        await initDataFiles();
         const logs = JSON.parse(fs.readFileSync(LOG_FILE, 'utf8'));
-        res.json(logs.reverse().slice(0, 50));
+        res.json([...logs].reverse().slice(0, 50));
     } catch (err) {
         res.json([]);
     }

@@ -250,28 +250,33 @@ function updateUI(logs, stats, syncInputs) {
     // Table
     const tbody = document.getElementById('log-body');
     const recent = [...logs].slice(0, 12);
-    tbody.innerHTML = recent.map(log => `
+    tbody.innerHTML = recent.map(log => {
+        const url = log.url || '/';
+        const displayUrl = url.length > 25 ? url.substring(0, 22) + '...' : url;
+        const payload = log.payload || '-';
+        const displayPayload = payload.length > 20 ? payload.substring(0, 17) + '...' : payload;
+        const riskScore = typeof log.risk === 'number' ? (log.risk * 100).toFixed(1) : '0.0';
+
+        return `
         <tr>
-            <td>${log.time}</td>
-            <td>${log.ip}</td>
-            <td><span style="font-size: 1.2rem; margin-right: 5px;">${getFlag(log.country)}</span> ${log.country}</td>
-            <td title="${log.url}">${log.url.substring(0, 25)}${log.url.length > 25 ? '...' : ''}</td>
-            <td title="${(log.payload || '').replace(/"/g, '&quot;')}" class="payload-cell">
-                ${(log.payload || '-').substring(0, 20)}${(log.payload || '').length > 20 ? '...' : ''}
-            </td>
+            <td>${log.time || '--:--'}</td>
+            <td>${log.ip || '0.0.0.0'}</td>
+            <td><span style="font-size: 1.2rem; margin-right: 5px;">${getFlag(log.country)}</span> ${log.country || 'Unknown'}</td>
+            <td title="${url}">${displayUrl}</td>
+            <td title="${payload.replace(/"/g, '&quot;')}" class="payload-cell">${displayPayload}</td>
             <td>
                 <span class="fingerprint-tag ${log.isBot ? 'tag-bot' : 'tag-human'}">
-                    ${log.isBot ? (log.botInfo || 'Automated') : 'Browser'}
+                    ${log.isBot ? 'Automated' : 'Browser'}
                 </span>
             </td>
-            <td><span style="color: ${log.type === 'Normal' ? 'var(--text-muted)' : 'var(--warning)'}">${log.type}</span></td>
+            <td><span style="color: ${log.type === 'Normal' ? 'var(--text-muted)' : 'var(--warning)'}">${log.type || 'Normal'}</span></td>
             <td>
-                <span class="risk-dot" style="background: ${getRiskColor(log.risk)}"></span>
-                ${(log.risk * 100).toFixed(1)}%
+                <span class="risk-dot" style="background: ${getRiskColor(log.risk || 0)}"></span>
+                ${riskScore}%
             </td>
-            <td><span class="status-tag ${log.status === 'Blocked' ? 'tag-blocked' : 'tag-allowed'}">${log.status}</span></td>
+            <td><span class="status-tag ${log.status === 'Blocked' ? 'tag-blocked' : 'tag-allowed'}">${log.status || 'Allowed'}</span></td>
         </tr>
-    `).join('');
+    `}).join('');
 
     // Charts
     updateCharts(logs, stats);
@@ -321,6 +326,7 @@ function updateThreatIntel(logs, stats) {
     updateBar('sqli', counts.sqli);
     updateBar('path', counts.path);
     updateBar('rce', counts.rce);
+    updateBar('anomaly', counts.anomaly);
 
 
     // Timeline stats
