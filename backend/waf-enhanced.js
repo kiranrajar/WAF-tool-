@@ -362,7 +362,7 @@ app.use(async (req, res, next) => {
                 risk = 1.0;
             }
 
-            if ((risk > config.riskThreshold || detectedType) && config.protectionMode === 'blocking') {
+            if ((risk > config.riskThreshold || detectedType) && (config.protectionMode === 'blocking' || config.protectionMode === 'stealth')) {
                 status = "Blocked";
                 if (!detectedType) type = "ML Anomaly Detection"; // Differentiate ML blocks from signatures
                 console.log(`🚨 BLOCKING: ${type} from ${cleanIp} (Risk: ${risk.toFixed(3)})`);

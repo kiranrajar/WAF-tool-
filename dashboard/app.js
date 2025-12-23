@@ -296,17 +296,19 @@ function updateUI(logs, stats, syncInputs) {
 }
 
 function updateThreatIntel(logs) {
-    if (!logs || logs.length === 0) return;
+    const counts = { xss: 0, sqli: 0, path: 0, rce: 0, anomaly: 0 };
 
-    const counts = { xss: 0, sqli: 0, path: 0, rce: 0 };
-    logs.forEach(l => {
-        if (l.type.includes('XSS')) counts.xss++;
-        if (l.type.includes('SQL')) counts.sqli++;
-        if (l.type.includes('Traversal')) counts.path++;
-        if (l.type.includes('Command') || l.type.includes('RCE')) counts.rce++;
-    });
+    if (logs && logs.length > 0) {
+        logs.forEach(l => {
+            if (l.type.includes('XSS')) counts.xss++;
+            else if (l.type.includes('SQL')) counts.sqli++;
+            else if (l.type.includes('Traversal')) counts.path++;
+            else if (l.type.includes('Command') || l.type.includes('RCE')) counts.rce++;
+            else if (l.type.includes('Anomaly')) counts.anomaly++;
+        });
+    }
 
-    const total = logs.length || 1;
+    const total = (logs && logs.length) || 1;
 
     // Update counts and bars
     const updateBar = (id, count) => {
@@ -320,6 +322,7 @@ function updateThreatIntel(logs) {
     updateBar('sqli', counts.sqli);
     updateBar('path', counts.path);
     updateBar('rce', counts.rce);
+
 
     // Timeline stats
     const blocked = logs.filter(l => l.status === 'Blocked' || l.status === 'Dropped (Stealth)').length;
