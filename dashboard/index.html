@@ -5,186 +5,177 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AEGIS Shield | AI-Powered Security Platform</title>
-    <link rel="stylesheet" href="style.css?v=3.0.0">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@500&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap"
         rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
     <aside class="sidebar">
         <div class="logo-container">
-            <div class="logo-icon">AE</div>
+            <div class="logo-icon">A</div>
             <div class="logo-text-wrapper">
                 <span class="logo-text">AEGIS SHIELD</span>
-                <span class="logo-subtitle">Enterprise Security</span>
+                <span class="logo-subtitle">Active Defense v3.1</span>
             </div>
         </div>
         <nav id="sidebar-nav">
-            <a href="#" data-tab="dashboard-tab" class="active">
+            <a href="#" class="active" data-tab="dashboard">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path
+                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6">
+                    </path>
+                </svg>
                 Overview
             </a>
-            <a href="#" data-tab="firewall-tab">
-                Security Policies
+            <a href="#" data-tab="intelligence">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path
+                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                    </path>
+                </svg>
+                Threat Intel
             </a>
-            <a href="#" data-tab="threat-tab">
-                Threat Intelligence
+            <a href="#" data-tab="firewall">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path
+                        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z">
+                    </path>
+                </svg>
+                Firewall
             </a>
-
-            <a href="#" data-tab="settings-tab">
-                Engine Settings
+            <a href="#" data-tab="settings">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path
+                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+                    </path>
+                    <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                Security Config
             </a>
         </nav>
+
         <div class="status-panel">
             <div class="status-header">
-                <span>Protection Status</span>
-                <span class="status-badge">ACTIVE</span>
+                <span style="font-size: 0.75rem; color: var(--text-secondary);">WAF Engine Status</span>
+                <span class="status-badge" id="engine-status">ACTIVE</span>
             </div>
-            <div class="progress-bar">
-                <div class="progress-fill"></div>
-            </div>
-            <div class="status-info">
-                <div class="info-item">
-                    <span class="info-label">Uptime</span>
-                    <span class="info-value" id="uptime">99.9%</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Engine</span>
-                    <span class="info-value">ML v2.5</span>
-                </div>
+            <div class="progress-container">
+                <div class="progress-bar" id="load-bar" style="width: 100%;"></div>
             </div>
         </div>
     </aside>
 
     <main class="main-wrapper">
-        <!-- Dashboard Tab -->
-        <div id="dashboard-tab" class="tab-content active">
-            <header>
-                <div class="header-meta">
-                    <h1>Security Operations Center</h1>
-                    <p>Real-time anomaly detection and traffic analysis</p>
-                </div>
-                <div class="controls-panel">
-                    <div class="mode-toggle">
-                        <label>Protection Mode:</label>
-                        <select id="protection-mode" class="select-field">
-                            <option value="blocking">🛡️ Blocking</option>
-                            <option value="stealth">👻 Stealth</option>
-                            <option value="lockdown">⛔ Lockdown</option>
-                            <option value="learning">🎓 Learning</option>
-                        </select>
-                    </div>
-                    <button id="refresh-data" class="btn">
-                        Force Refresh
-                    </button>
-                    <button id="open-sim" class="btn btn-outline" style="opacity: 0.5;">
-                        Attack Simulator
-                    </button>
-                </div>
-            </header>
+        <header>
+            <div class="header-meta">
+                <h1 id="page-title">Security Enterprise Control</h1>
+                <p>Advanced analytics and attack pattern recognition</p>
+            </div>
+            <div class="controls-panel">
+                <button class="btn" id="force-refresh">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.5">
+                        <path
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                        </path>
+                    </svg>
+                    Force Refresh
+                </button>
+                <button class="btn btn-danger" id="open-simulator">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.5">
+                        <path
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+                        </path>
+                    </svg>
+                    Attack Simulator
+                </button>
+            </div>
+        </header>
 
-            <section class="stat-row">
-                <div class="stat-card">
-                    <div class="card-label">Total Requests</div>
-                    <div id="stat-total" class="card-value">0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="card-label">Threats Blocked</div>
-                    <div id="stat-blocked" class="card-value">0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="card-label">Avg Risk Score</div>
-                    <div id="stat-risk" class="card-value">0.0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="card-label">Blocked Addresses</div>
-                    <div id="stat-bans" class="card-value">0</div>
-                </div>
-            </section>
-
-            <section class="dashboard-grid">
-                <!-- Map Section Removed as per request -->
-                <!-- Move Attack Distribution here if needed or keep it separate -->
-            </section>
-
-            <section class="dashboard-grid">
-                <div class="card chart-card">
-                    <h3>Threat Velocity (Last 24h)</h3>
-                    <canvas id="velocityChart"></canvas>
-                </div>
-                <div class="card chart-card">
-                    <h3>Attack Distribution</h3>
-                    <canvas id="vectorChart"></canvas>
-                </div>
-            </section>
-
-            <section class="data-table-container">
-                <div class="table-header">
-                    <h3>Live Traffic Monitor</h3>
-                    <div class="live-indicator">
-                        <div class="pulse-dot"></div>
-                        <span>Live Feed</span>
+        <!-- DASHBOARD TAB -->
+        <div id="dashboard" class="tab-content active">
+            <div class="stat-row">
+                <div class="card stat-card">
+                    <div class="card-icon">⚡</div>
+                    <div class="card-content">
+                        <div class="card-label">Total Traffic</div>
+                        <div class="card-value" id="stat-total">0</div>
                     </div>
                 </div>
-                <div class="table-scroll">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Time</th>
-                                <th>Source IP</th>
-                                <th>Region</th>
-                                <th>Endpoint</th>
-                                <th>Payload</th>
-                                <th>Fingerprint</th>
-                                <th>Classification</th>
-                                <th>Risk</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="log-body"></tbody>
-                    </table>
+                <div class="card stat-card danger-card">
+                    <div class="card-icon" style="color: var(--danger)">🛡️</div>
+                    <div class="card-content">
+                        <div class="card-label">Threats Blocked</div>
+                        <div class="card-value" id="stat-blocked">0</div>
+                    </div>
                 </div>
-            </section>
-        </div>
-
-        <!-- Firewall Tab -->
-        <div id="firewall-tab" class="tab-content">
-            <header>
-                <div class="header-meta">
-                    <h1>Access Control</h1>
-                    <p>Manage IP blacklists and access rules</p>
+                <div class="card stat-card warning-card">
+                    <div class="card-icon" style="color: var(--warning)">🧠</div>
+                    <div class="card-content">
+                        <div class="card-label">Avg Risk Score</div>
+                        <div class="card-value" id="stat-risk">0.000</div>
+                    </div>
                 </div>
-            </header>
-            <div class="firewall-manager">
-                <div class="card firewall-card" style="width: 100%;">
-                    <h3>IP Blacklist</h3>
-                    <p class="card-description">Permanently blocked addresses</p>
-                    <div class="ip-list" id="blacklist-view"></div>
-                    <div class="input-group">
-                        <input type="text" id="add-ip-field" placeholder="Enter IP address (e.g. 192.168.1.100)">
-                        <button id="btn-add-ip" class="btn btn-primary">Add to Blacklist</button>
+                <div class="card stat-card success-card">
+                    <div class="card-icon" style="color: var(--success)">🔒</div>
+                    <div class="card-content">
+                        <div class="card-label">Active Bans</div>
+                        <div class="card-value" id="stat-bans">0</div>
                     </div>
                 </div>
             </div>
+
+            <div class="dashboard-grid">
+                <div class="card">
+                    <h3>Traffic Analysis Velocity</h3>
+                    <canvas id="velocityChart"></canvas>
+                </div>
+                <div class="card">
+                    <h3>Threat Vector Profile</h3>
+                    <canvas id="vectorChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="table-header">
+                    <h3>Live Traffic Monitor</h3>
+                    <span class="status-badge">Real-time Stream</span>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>TimeStamp</th>
+                            <th>Source IP</th>
+                            <th>GEO</th>
+                            <th>Entity/URL</th>
+                            <th>Payload Digest</th>
+                            <th>Fingerprint</th>
+                            <th>Inquiry Type</th>
+                            <th>Risk Score</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="log-body">
+                        <!-- Logs will be injected here -->
+                    </tbody>
+                </table>
+            </div>
         </div>
 
-        <!-- Threat Intelligence Tab -->
-        <div id="threat-tab" class="tab-content">
-            <header>
-                <div class="header-meta">
-                    <h1>Threat Intelligence Hub</h1>
-                    <p>Advanced analytics and attack pattern recognition</p>
-                </div>
-            </header>
+        <!-- THREAT INTEL TAB -->
+        <div id="intelligence" class="tab-content">
             <div class="threat-grid">
-                <div class="card threat-card">
+                <div class="card">
                     <h3>Top Attack Vectors</h3>
-                    <div class="threat-list" id="top-threats">
+                    <div class="threat-list">
                         <div class="threat-item">
-                            <div class="threat-info">
-                                <span class="threat-name">SQL Injection</span>
-                            </div>
+                            <span class="threat-name">SQL Injection</span>
                             <div class="threat-stats">
                                 <span class="threat-count" id="sqli-count">0</span>
                                 <div class="threat-bar">
@@ -193,9 +184,7 @@
                             </div>
                         </div>
                         <div class="threat-item">
-                            <div class="threat-info">
-                                <span class="threat-name">XSS Attacks</span>
-                            </div>
+                            <span class="threat-name">XSS Attacks</span>
                             <div class="threat-stats">
                                 <span class="threat-count" id="xss-count">0</span>
                                 <div class="threat-bar">
@@ -204,9 +193,7 @@
                             </div>
                         </div>
                         <div class="threat-item">
-                            <div class="threat-info">
-                                <span class="threat-name">Path Traversal</span>
-                            </div>
+                            <span class="threat-name">Path Traversal</span>
                             <div class="threat-stats">
                                 <span class="threat-count" id="path-count">0</span>
                                 <div class="threat-bar">
@@ -215,202 +202,176 @@
                             </div>
                         </div>
                         <div class="threat-item">
-                            <div class="threat-info">
-                                <span class="threat-name">WebShell/RCE</span>
-                            </div>
+                            <span class="threat-name">WebShell/RCE</span>
                             <div class="threat-stats">
                                 <span class="threat-count" id="rce-count">0</span>
                                 <div class="threat-bar">
                                     <div class="threat-bar-fill" id="rce-bar"></div>
                                 </div>
                             </div>
-                            <div class="threat-item">
-                                <div class="threat-info">
-                                    <span class="threat-name">ML Anomaly Detection</span>
-                                </div>
-                                <div class="threat-stats">
-                                    <span class="threat-count" id="anomaly-count">0</span>
-                                    <div class="threat-bar">
-                                        <div class="threat-bar-fill" id="anomaly-bar"></div>
-                                    </div>
+                        </div>
+                        <div class="threat-item">
+                            <span class="threat-name">ML Anomaly Detection</span>
+                            <div class="threat-stats">
+                                <span class="threat-count" id="anomaly-count">0</span>
+                                <div class="threat-bar">
+                                    <div class="threat-bar-fill" id="anomaly-bar"></div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <h3>Geographic Risk Assessment</h3>
-                        <div class="geo-map-container">
-                            <div id="geo-heatmap" class="heatmap-placeholder">
-                                <div class="heatmap-overlay">Real-time Threat Cluster Analysis Active</div>
-                            </div>
-                        </div>
-                        <div class="geo-stats" id="geo-stats">
-                            <!-- Countries will be injected here -->
                         </div>
                     </div>
                 </div>
                 <div class="card">
-                    <h3>Incident Discovery Timeline</h3>
-                    <div class="timeline-stats">
-                        <div class="timeline-item">
-                            <span class="timeline-label">Last Hour</span>
-                            <span class="timeline-value" id="attacks-hour">0</span>
+                    <h3>Geographic Risk Assessment</h3>
+                    <div id="threat-map" class="geo-map">
+                        <div class="map-placeholder">
+                            <div class="map-loader"></div>
+                            <span>Initializing Global Cluster Analysis...</span>
                         </div>
-                        <div class="timeline-item">
-                            <span class="timeline-label">Last 24 Hours</span>
-                            <span class="timeline-value" id="attacks-day">0</span>
-                        </div>
-                        <div class="timeline-item">
-                            <span class="timeline-label">Peak Attack Time</span>
-                            <span class="timeline-value" id="peak-time">--:--</span>
-                        </div>
-                        <div class="timeline-item">
-                            <span class="timeline-label">Avg Response Time</span>
-                            <span class="timeline-value">0.8ms</span>
-                        </div>
+                        <!-- Attack icons will be injected here -->
+                    </div>
+                    <div class="geo-stats" id="geo-stats">
+                        <!-- Countries injected here -->
                     </div>
                 </div>
             </div>
 
-
-
-
-
-            <!-- Settings Tab -->
-            <div id="settings-tab" class="tab-content">
-                <header>
-                    <div class="header-meta">
-                        <h1>Global Configuration</h1>
-                        <p>Manage application target, policies, and detection modules</p>
+            <div class="card" style="margin-top: 2rem;">
+                <h3>Incident Discovery Timeline</h3>
+                <div class="timeline-stats">
+                    <div class="timeline-item">
+                        <span class="timeline-label">Last Hour</span>
+                        <span class="timeline-value" id="attacks-hour">0</span>
                     </div>
-                </header>
-                <div class="settings-grid">
-                    <div class="card">
-                        <h3>Application Policy</h3>
-                        <div class="settings-form">
-                            <div class="form-item" style="margin-bottom: 1rem;">
-                                <label
-                                    style="display:block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">Protected
-                                    Application (Target URL)</label>
-                                <input type="text" id="cfg-target" placeholder="http://localhost:5000"
-                                    style="width: 100%; padding: 0.75rem; background: var(--bg-main); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;">
-                            </div>
-                            <div class="form-item" style="margin-bottom: 1rem;">
-                                <label
-                                    style="display:block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">Rate
-                                    Limit (Req/Min)</label>
-                                <input type="number" id="cfg-rate-limit" value="100"
-                                    style="width: 100%; padding: 0.75rem; background: var(--bg-main); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;">
-                            </div>
-                            <div class="form-item" style="margin-bottom: 1rem;">
-                                <label
-                                    style="display:block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">Risk
-                                    Threshold (%)</label>
-                                <input type="number" id="cfg-threshold" value="88"
-                                    style="width: 100%; padding: 0.75rem; background: var(--bg-main); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;">
-                            </div>
-                            <div class="form-item" style="margin-bottom: 1rem;">
-                                <label
-                                    style="display:block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">Protection
-                                    Mode</label>
-                                <select id="cfg-mode"
-                                    style="width: 100%; padding: 0.75rem; background: var(--bg-main); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;">
-                                    <option value="blocking">🛡️ Blocking (Active Defense)</option>
-                                    <option value="stealth">👻 Stealth (Silent Drop)</option>
-                                    <option value="lockdown">⛔ Lockdown (Block All)</option>
-                                    <option value="learning">👀 Learning (Log Only)</option>
-                                </select>
-                            </div>
-                            <div class="form-item">
-                                <label
-                                    style="display:block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">Geo-Blocked
-                                    Countries (ISO)</label>
-                                <input type="text" id="cfg-geo" placeholder="CN, RU, KP"
-                                    style="width: 100%; padding: 0.75rem; background: var(--bg-main); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;">
-                            </div>
-                        </div>
+                    <div class="timeline-item">
+                        <span class="timeline-label">Last 24 Hours</span>
+                        <span class="timeline-value" id="attacks-day">0</span>
                     </div>
-                    <div class="card">
-                        <h3>Security Modules</h3>
-                        <div class="settings-list">
-                            <div class="setting-item">
-                                <div class="setting-info">
-                                    <span class="setting-label">SQL Injection</span>
-                                    <span class="setting-desc">Detect SQLi payloads</span>
-                                </div>
-                                <input type="checkbox" id="mod-sqli" class="toggle-switch">
-                            </div>
-                            <div class="setting-item">
-                                <div class="setting-info">
-                                    <span class="setting-label">Cross-Site Scripting (XSS)</span>
-                                    <span class="setting-desc">Detect script injection</span>
-                                </div>
-                                <input type="checkbox" id="mod-xss" class="toggle-switch">
-                            </div>
-                            <div class="setting-item">
-                                <div class="setting-info">
-                                    <span class="setting-label">Path Traversal</span>
-                                    <span class="setting-desc">Detect file system access</span>
-                                </div>
-                                <input type="checkbox" id="mod-path" class="toggle-switch">
-                            </div>
-                            <div class="setting-item">
-                                <div class="setting-info">
-                                    <span class="setting-label">Command Injection (RCE)</span>
-                                    <span class="setting-desc">Detect system commands</span>
-                                </div>
-                                <input type="checkbox" id="mod-rce" class="toggle-switch">
-                            </div>
-                            <div class="setting-item">
-                                <div class="setting-info">
-                                    <span class="setting-label">Bot Analysis</span>
-                                    <span class="setting-desc">Detect automated scripts</span>
-                                </div>
-                                <input type="checkbox" id="mod-bot" class="toggle-switch">
-                            </div>
-                        </div>
+                    <div class="timeline-item">
+                        <span class="timeline-label">Peak Attack Time</span>
+                        <span class="timeline-value" id="peak-time">--:--</span>
                     </div>
-                </div>
-                <div class="card" style="margin-top: 20px;">
-                    <button id="save-config" class="btn btn-primary"
-                        style="width: 100%; justify-content: center; padding: 1rem;">Save System Configuration</button>
+                    <div class="timeline-item">
+                        <span class="timeline-label">Protected Assets</span>
+                        <span class="timeline-value">Global</span>
+                    </div>
                 </div>
             </div>
+        </div>
+
+        <!-- FIREWALL TAB -->
+        <div id="firewall" class="tab-content">
+            <div class="firewall-manager">
+                <div class="card">
+                    <h3>IP Blacklist (Global)</h3>
+                    <p class="card-description">Addresses in this list are dropped immediately before inspection.</p>
+                    <div class="ip-list" id="blacklist-view">
+                        <!-- IPs injected here -->
+                    </div>
+                    <div class="input-group">
+                        <input type="text" id="add-ip-field" placeholder="192.168.1.1">
+                        <button class="btn btn-normal" id="btn-add-ip">Add To Blacklist</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>Active Ban Policies</h3>
+                    <div class="rules-list">
+                        <div class="rule-item">
+                            <div class="rule-header">
+                                <span class="rule-icon">🕒</span>
+                                <span class="rule-name">Ban Duration</span>
+                            </div>
+                            <span class="rule-value">24 Hours</span>
+                        </div>
+                        <div class="rule-item">
+                            <div class="rule-header">
+                                <span class="rule-icon">📉</span>
+                                <span class="rule-name">Risk Threshold</span>
+                            </div>
+                            <span class="rule-value danger-text">High</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SETTINGS TAB -->
+        <div id="settings" class="tab-content">
+            <div class="settings-grid">
+                <div class="card">
+                    <h3>Aegis Engine Core</h3>
+                    <div class="settings-list">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <span class="setting-label">Target Application URL</span>
+                                <span class="setting-desc">The internal server AEGIS protects</span>
+                            </div>
+                            <input type="text" id="cfg-target" class="setting-input-inline"
+                                placeholder="http://target:5000">
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <span class="setting-label">Global Protection Mode</span>
+                                <span class="setting-desc">Drop traffic silently or show block page</span>
+                            </div>
+                            <select id="cfg-mode" class="setting-input-inline">
+                                <option value="blocking">Active Blocking</option>
+                                <option value="stealth">Stealth (Silent Drop)</option>
+                                <option value="log-only">Observation Only</option>
+                                <option value="lockdown">Global Lockdown</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <span class="setting-label">ML Risk Sensitivity</span>
+                                <span class="setting-desc">0% (Lenient) to 100% (Aggressive)</span>
+                            </div>
+                            <input type="range" id="cfg-threshold" min="30" max="95" value="88">
+                        </div>
+                        <button class="btn btn-normal" id="save-config"
+                            style="width: 100%; justify-content: center; margin-top: 1rem;">Deploy
+                            Configuration</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>Enabled Defense Modules</h3>
+                    <div class="settings-list">
+                        <label class="toggle-item"><input type="checkbox" id="mod-sqli" checked> SQL Discovery</label>
+                        <label class="toggle-item"><input type="checkbox" id="mod-xss" checked> XSS Vector
+                            Filter</label>
+                        <label class="toggle-item"><input type="checkbox" id="mod-path" checked> Traversal Guard</label>
+                        <label class="toggle-item"><input type="checkbox" id="mod-rce" checked> Code Injection
+                            Shield</label>
+                        <label class="toggle-item"><input type="checkbox" id="mod-bot" checked> Bot
+                            Fingerprinting</label>
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
 
-    <div id="sim-modal" class="modal">
-        <div class="modal-content">
+    <!-- Modal for Simulator -->
+    <div class="modal-overlay" id="sim-modal">
+        <div class="modal-card">
             <div class="modal-header">
-                <h3>Security Lab: Attack Simulator</h3>
-                <button id="close-sim" class="btn-close">&times;</button>
+                <h3>AEGIS Threat Simulator</h3>
+                <button class="close-btn" id="close-sim">×</button>
             </div>
-            <div class="modal-body">
-                <p>Test your security policies by triggering controlled attack vectors.</p>
-                <div class="sim-grid">
-                    <button class="sim-btn" data-type="sqli">💉 SQL Injection</button>
-                    <button class="sim-btn" data-type="xss">📜 Cross-Site Scripting</button>
-                    <button class="sim-btn" data-type="traversal">📂 Path Traversal</button>
-                    <button class="sim-btn" data-type="rce">💻 Remote Code Execution</button>
-                    <button class="sim-btn warning-btn" data-type="anomaly"
-                        style="background: rgba(210, 153, 34, 0.2); border: 1px solid #d29922; color: #d29922;">🤖 ML
-                        Anomaly</button>
-                    <button class="sim-btn btn-success" data-type="normal">✅ Normal Traffic</button>
-                </div>
-                <hr style="border: 0; border-top: 1px solid var(--border); margin: 1.5rem 0;">
-                <div style="text-align: center;">
-                    <button class="sim-btn btn-danger" id="carpet-bomb-btn"
-                        style="width: 100%; background: #da3633; color: white;">
-                        🔥 RED TEAM: CARPET BOMB (50 Attacks)
-                    </button>
-                    <p style="margin-top: 10px; font-size: 0.8em; color: var(--text-secondary);">Simulates a
-                        high-intensity heuristic scan to test Reputation & Auto-Ban logic.</p>
-                </div>
+            <p>Select an attack vector to test your protection rules:</p>
+            <div class="sim-grid">
+                <button class="sim-btn" onclick="testAttack('sqli')">SQL Injection</button>
+                <button class="sim-btn" onclick="testAttack('xss')">XSS Exploit</button>
+                <button class="sim-btn" onclick="testAttack('traversal')">Path Traversal</button>
+                <button class="sim-btn" onclick="testAttack('rce')">Remote Code Exec</button>
+                <button class="sim-btn" onclick="testAttack('anomaly')">Anomaly Probe</button>
             </div>
+            <button class="btn btn-danger" id="carpet-bomb-btn" style="width: 100%; margin-top: 1.5rem;">🔥 Red Team:
+                Full Carpet Bomb</button>
         </div>
     </div>
 
     <div id="toast-area"></div>
-    <script src="app.js?v=3.1.0"></script>
+    <script src="app.js"></script>
 </body>
 
 </html>

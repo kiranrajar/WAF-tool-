@@ -510,15 +510,19 @@ app.use('/', limiter, (req, res, next) => {
 app.get('/api/stats', async (req, res) => {
     try {
         let logs = [], blacklist = [], config = {};
-        let total = 0, blocked = 0, mapCritical = 0, mapAnomalies = 0;
+        let total = 0, blocked = 0;
         let threats = { 'SQL Injection': 0, 'XSS': 0, 'Path Traversal': 0, 'WebShell/RCE': 0, 'ML Anomaly Detection': 0 };
+        let geoStats = {};
+
+        // Helper to ensure we have a connection or wait a bit (Vercel cold start)
+        if (MONGODB_URI && mongoose.connection.readyState !== 1) {
+            await new Promise(r => setTimeout(r, 800)); // Wait for connection
+        }
 
         if (MONGODB_URI && mongoose.connection.readyState === 1) {
             // High-performance counts
             total = await Log.countDocuments();
             blocked = await Log.countDocuments({ status: "Blocked" });
-            mapCritical = await Log.countDocuments({ status: "Blocked", risk: { $gte: 0.8 } });
-            mapAnomalies = await Log.countDocuments({ status: "Blocked", risk: { $lt: 0.8 } });
 
             // Get threat breakdown
             const threatStats = await Log.aggregate([
@@ -527,13 +531,21 @@ app.get('/api/stats', async (req, res) => {
             ]);
             threatStats.forEach(t => { threats[t._id] = t.count; });
 
+            // Geo stats aggregation
+            const gStats = await Log.aggregate([
+                { $match: { status: "Blocked" } },
+                { $group: { _id: "$country", count: { $sum: 1 } } },
+                { $sort: { count: -1 } },
+                { $limit: 10 }
+            ]);
+            gStats.forEach(g => { geoStats[g._id] = g.count; });
+
             const bl = await Blacklist.find().lean();
             blacklist = bl;
             const dbConfig = await Config.findOne({ id: 'global' }).lean();
             config = dbConfig || DEFAULT_CONFIG;
 
-            // Getting last 50 for the timeline velocity graph
-            logs = await Log.find().sort({ timestamp: -1 }).limit(50);
+            logs = await Log.find().sort({ timestamp: -1 }).limit(50).lean();
         } else {
             await initDataFiles();
             logs = JSON.parse(fs.readFileSync(LOG_FILE, 'utf8'));
@@ -541,18 +553,19 @@ app.get('/api/stats', async (req, res) => {
             config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
             total = logs.length;
             blocked = logs.filter(l => l.status === "Blocked").length;
-            mapCritical = logs.filter(l => l.status === "Blocked" && l.risk >= 0.8).length;
-            mapAnomalies = logs.filter(l => l.status === "Blocked" && l.risk < 0.8).length;
-            logs.forEach(l => { if (l.type !== "Normal") threats[l.type] = (threats[l.type] || 0) + 1; });
+            logs.forEach(l => {
+                if (l.type !== "Normal") threats[l.type] = (threats[l.type] || 0) + 1;
+                if (l.status === "Blocked") geoStats[l.country] = (geoStats[l.country] || 0) + 1;
+            });
         }
 
         res.json({
             total, blocked, allowed: total - blocked,
             avgRisk: logs.length > 0 ? logs.reduce((acc, l) => acc + l.risk, 0) / logs.length : 0,
-            threats, mapCritical, mapAnomalies,
+            threats, geoStats,
             blacklistCount: blacklist.length,
             config,
-            recentLogs: logs.map(l => l.toObject ? l.toObject() : l) // Ensure plain JS objects
+            recentLogs: logs.map(l => ({ ...l, id: l._id })) // Ensure ID for mapping
         });
     } catch (err) {
         console.error("Stats API Error:", err);

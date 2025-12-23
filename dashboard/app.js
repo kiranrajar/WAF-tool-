@@ -14,52 +14,68 @@ const COUNTRY_COORDS = {
     'Unknown': { x: 50, y: 95 }
 };
 
-document.addEventListener('DOMContentLoaded', () => {
-    try {
-        initCharts();
-    } catch (e) {
-        console.warn("Chart system standby: UI placeholders active.");
-    }
-    syncData();
-    setInterval(() => {
-        syncData().catch(e => console.warn("Sync pulse retry..."));
-    }, 2000);
+let currentConfig = {};
+let velocityChart, vectorChart;
 
-    // Navigation
+document.addEventListener('DOMContentLoaded', () => {
+    initCharts();
+    syncData(true);
+
+    // Auto-poll logs and stats every 2 seconds
+    setInterval(() => syncData(), 2000);
+
+    // Navigation Logic
     document.querySelectorAll('#sidebar-nav a').forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
-            const target = link.getAttribute('data-tab');
+            const tabId = link.getAttribute('data-tab');
 
+            // Switch Menu
             document.querySelectorAll('#sidebar-nav a').forEach(l => l.classList.remove('active'));
             link.classList.add('active');
 
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            document.getElementById(target).classList.add('active');
+            // Switch Tab
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById(tabId)?.classList.add('active');
+
+            // Update Title
+            const titles = {
+                'dashboard': 'Security Enterprise Control',
+                'intelligence': 'Threat Intelligence Hub',
+                'firewall': 'Active Barrier Management',
+                'settings': 'Core Propulsion Settings'
+            };
+            document.getElementById('page-title').innerText = titles[tabId] || 'Command Center';
         });
     });
 
-    // Configuration Sync
+    // Modal Control
+    document.getElementById('open-simulator')?.addEventListener('click', () => {
+        document.getElementById('sim-modal').classList.add('active');
+    });
+    document.getElementById('close-sim')?.addEventListener('click', () => {
+        document.getElementById('sim-modal').classList.remove('active');
+    });
+
+    // Force Refresh
+    document.getElementById('force-refresh')?.addEventListener('click', () => {
+        showToast("🔄 Force Synchronizing with Engine...");
+        syncData(true);
+    });
+
+    // Save Settings
     document.getElementById('save-config')?.addEventListener('click', async () => {
-        const btn = document.getElementById('save-config');
-        const originalText = btn.innerText;
-        btn.innerText = "Saving...";
-        btn.disabled = true;
-
-        const getCheck = (id) => document.getElementById(id)?.checked ?? true;
-
-        const config = {
-            targetUrl: document.getElementById('cfg-target').value, // Allow empty or custom
-            rateLimit: parseInt(document.getElementById('cfg-rate-limit').value) || 100,
-            riskThreshold: parseFloat(document.getElementById('cfg-threshold').value) / 100,
-            blockedCountries: document.getElementById('cfg-geo').value.split(',').map(s => s.trim().toUpperCase()).filter(s => s.length === 2),
-            protectionMode: document.getElementById('cfg-mode') ? document.getElementById('cfg-mode').value : 'blocking',
+        const payload = {
+            targetUrl: document.getElementById('cfg-target').value,
+            rateLimit: parseInt(document.getElementById('cfg-rate-limit')?.value || 100),
+            riskThreshold: parseInt(document.getElementById('cfg-threshold').value) / 100,
+            protectionMode: document.getElementById('cfg-mode').value,
             modules: {
-                sqli: getCheck('mod-sqli'),
-                xss: getCheck('mod-xss'),
-                pathTraversal: getCheck('mod-path'),
-                rce: getCheck('mod-rce'),
-                bot: getCheck('mod-bot')
+                sqli: document.getElementById('mod-sqli').checked,
+                xss: document.getElementById('mod-xss').checked,
+                pathTraversal: document.getElementById('mod-path').checked,
+                rce: document.getElementById('mod-rce').checked,
+                bot: document.getElementById('mod-bot').checked
             }
         };
 
@@ -67,121 +83,52 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch(`${API_BASE}/config`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(config)
+                body: JSON.stringify(payload)
             });
-
-            if (res.ok) {
-                showToast("✅ Global configuration updated and modules hot-reloaded");
-                syncData(); // Refresh UI to confirm persistence
-            } else {
-                showToast("❌ Failed to save configuration");
-            }
+            if (res.ok) showToast("✅ Configuration deployed to AEGIS Cloud");
         } catch (e) {
-            showToast("❌ Network Error: Could not save config");
-        } finally {
-            btn.innerText = originalText;
-            btn.disabled = false;
+            showToast("❌ Connection Failure during deployment");
         }
     });
 
-    // Sync Protection Mode Dropdowns
-    const headerMode = document.getElementById('protection-mode');
-    const settingMode = document.getElementById('cfg-mode');
-
-    if (headerMode && settingMode) {
-        headerMode.addEventListener('change', () => {
-            settingMode.value = headerMode.value;
-            document.getElementById('save-config').click();
-        });
-        settingMode.addEventListener('change', () => {
-            headerMode.value = settingMode.value;
-            // distinct from save, just sync UI until save clicked? 
-            // actually user expects save on settings page usually manually, but header is quick toggle
-        });
-    }
-
-    // Refresh Data
-    document.getElementById('refresh-data')?.addEventListener('click', syncData);
-
-    // Modal Logic
-    const modal = document.getElementById('sim-modal');
-    document.getElementById('open-sim')?.addEventListener('click', () => modal.classList.add('active'));
-    document.getElementById('close-sim')?.addEventListener('click', () => modal.classList.remove('active'));
-
-    // Simulator Actions
-    document.querySelectorAll('.sim-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const type = btn.getAttribute('data-type');
-            const targets = {
-                sqli: "/login?user=admin' OR 1=1--",
-                xss: "/search?q=<script>alert(1)</script>",
-                traversal: "/file?path=../../etc/passwd",
-                rce: "/cmd?exec=rm -rf /",
-                anomaly: "/api/check?token=$$$$$$$$$$$$$$$$^^^^^^^^^^^^^^^^^^^^@@@@@@@@@@",
-                normal: "/"
-            };
-
-            showToast(`🚀 Sending ${type.toUpperCase()} request...`);
-            // Use relative path so it hits the same origin (works for Vercel & Proxy)
-            fetch(targets[type] || '/');
-            modal.classList.remove('active');
-        });
-    });
-
-    // Red Team: Carpet Bomb
-    document.getElementById('carpet-bomb-btn')?.addEventListener('click', async () => {
-        const modal = document.getElementById('sim-modal');
-        modal.classList.remove('active');
-        showToast("🔥 Initiating Carpet Bomb Attack Sequence...");
-
-        const vectors = ['sqli', 'xss', 'traversal', 'rce', 'anomaly'];
-        const targets = {
-            sqli: ["/search?q=' OR 1=1 --", "/login?u=admin'--", "/products/1; DROP TABLE users"],
-            xss: ["/search?q=<script>alert(1)</script>", "/user/<img src=x onerror=alert(1)>", "/comment?text=%3Cbody%20onload%3Dalert(1)%3E"],
-            traversal: ["/file?path=../../etc/passwd", "/d/..%2f..%2fwindows%2fwin.ini", "/static/../../.env"],
-            rce: ["/cmd?exec=rm -rf /", "/api/ping_test?host=127.0.0.1|whoami", "/v1/shell?c=ls%20-la"], // Changed to ping_test to avoid WAF bypass
-            anomaly: ["/api/check_test?token=$$$$$$$$$$$$", "/v1/auth?key=invalid_hex_string_overflow", "/data/process/%ff%00%11%22"]
-        };
-
-        for (let i = 0; i < 50; i++) {
-            // Randomly select vector
-            const vector = vectors[Math.floor(Math.random() * vectors.length)];
-            const payload = targets[vector][Math.floor(Math.random() * targets[vector].length)];
-
-            // Fire and Forget (don't await response to simulate concurrent flood)
-            fetch(payload).catch(e => { });
-
-            // Small random delay (50-150ms) to look like a script
-            await new Promise(r => setTimeout(r, Math.floor(Math.random() * 100) + 50));
-
-            if (i % 10 === 0) showToast(`🔥 Flooding... Request ${i}/50`);
-        }
-        showToast("✅ Red Team Exercise Complete");
-        syncData();
-    });
-
-    // Firewall
-    document.getElementById('btn-add-ip').addEventListener('click', async () => {
+    // Add To Blacklist
+    document.getElementById('btn-add-ip')?.addEventListener('click', async () => {
         const ip = document.getElementById('add-ip-field').value;
         if (ip) {
-            showToast(`⚠️ Blacklisting ${ip}...`);
+            showToast(`🛡️ Blacklisting IP: ${ip}`);
             await fetch(`${API_BASE}/config`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    ...currentConfig,
-                    blacklist: [...(currentConfig.blacklist || []), ip]
-                })
+                body: JSON.stringify({ ...currentConfig, blacklist: [...(currentConfig.blacklist || []), ip] })
             });
             document.getElementById('add-ip-field').value = '';
             syncData();
         }
     });
 
+    // Red Team Exercise
+    document.getElementById('carpet-bomb-btn')?.addEventListener('click', async () => {
+        document.getElementById('sim-modal').classList.remove('active');
+        showToast("🔥 Initiating High-Velocity Carpet Bomb Attack...");
 
+        const vectors = ['sqli', 'xss', 'traversal', 'rce', 'anomaly'];
+        const attackPaths = {
+            sqli: ["/api/v1/auth?u=admin' OR 1=1--", "/products?id=1; DROP TABLE logs"],
+            xss: ["/search?q=<script>alert('pwned')</script>", "/user/profile?bio=<img src=x onerror=alert(1)>"],
+            traversal: ["/static/../../etc/passwd", "/download?file=..%2f..%2fconfig.env"],
+            rce: ["/cmd?exec=whoami;ls", "/v1/shell?run=bash -i"],
+            anomaly: ["/api/check?token=$$%FF%00", "/data/binary/overflow_test_raw_payload"]
+        };
+
+        for (let i = 0; i < 40; i++) {
+            const v = vectors[Math.floor(Math.random() * vectors.length)];
+            const path = attackPaths[v][Math.floor(Math.random() * attackPaths[v].length)];
+            fetch(path).catch(e => { });
+            await new Promise(r => setTimeout(r, 100)); // Delay to simulate real traffic
+        }
+        showToast("✅ Attack Sequence Complete");
+    });
 });
-
-let currentConfig = {};
 
 async function syncData(syncInputs = false) {
     try {
@@ -191,341 +138,192 @@ async function syncData(syncInputs = false) {
         currentConfig = stats.config || {};
         const logs = stats.recentLogs || [];
 
-        if (stats.total !== undefined) {
-            updateUI(logs, stats, syncInputs);
-            updateMap(logs, stats);
-        }
+        updateUI(logs, stats, syncInputs);
+        updateMap(logs, stats);
     } catch (err) {
         console.warn("Retrying engine sync...");
     }
 }
 
-
-
 function updateUI(logs, stats, syncInputs) {
-    const config = stats.config || {};
-
     // Stats Cards
-    const safeSetText = (id, val) => {
-        const el = document.getElementById(id);
-        if (el) el.innerText = val;
-    };
+    const safeSet = (id, val) => { if (document.getElementById(id)) document.getElementById(id).innerText = val; };
+    safeSet('stat-total', stats.total || 0);
+    safeSet('stat-blocked', stats.blocked || 0);
+    safeSet('stat-risk', (stats.avgRisk || 0).toFixed(3));
+    safeSet('stat-bans', stats.blacklistCount || 0);
 
-    safeSetText('stat-total', stats.total || 0);
-    safeSetText('stat-blocked', stats.blocked || 0);
-    safeSetText('stat-risk', (stats.avgRisk || 0).toFixed(3));
-    safeSetText('stat-bans', stats.blacklistCount || 0);
+    // Sync Fields if needed
+    if (syncInputs && currentConfig) {
+        const s = (id, v) => { if (document.getElementById(id)) document.getElementById(id).value = v || ''; };
+        const c = (id, v) => { if (document.getElementById(id)) document.getElementById(id).checked = !!v; };
 
-    // Config Fields (Only update when explicitly requested)
-    if (syncInputs && document.getElementById('save-config') && config) {
-        const setVal = (id, v) => {
-            const el = document.getElementById(id);
-            if (el) el.value = v || '';
-        };
-        // Default true if missing or undefined in config, but handle UI existence check
-        const setCheck = (id, v) => {
-            const el = document.getElementById(id);
-            if (el) el.checked = v !== false;
-        };
+        s('cfg-target', currentConfig.targetUrl);
+        s('cfg-mode', currentConfig.protectionMode);
+        s('cfg-threshold', Math.round((currentConfig.riskThreshold || 0.88) * 100));
 
-        setVal('cfg-target', config.targetUrl);
-        setVal('cfg-rate-limit', config.rateLimit);
-        setVal('cfg-threshold', Math.round((config.riskThreshold || 0.5) * 100));
-        setVal('cfg-geo', config.blockedCountries?.join(', '));
-        // Try both new and old IDs
-        if (document.getElementById('protection-mode')) setVal('protection-mode', config.protectionMode);
-        if (document.getElementById('cfg-mode')) setVal('cfg-mode', config.protectionMode);
-
-        const modules = config.modules || {};
-        setCheck('mod-sqli', modules.sqli);
-        setCheck('mod-xss', modules.xss);
-        setCheck('mod-path', modules.pathTraversal);
-        setCheck('mod-rce', modules.rce);
-        setCheck('mod-bot', modules.bot);
+        const m = currentConfig.modules || {};
+        c('mod-sqli', m.sqli);
+        c('mod-xss', m.xss);
+        c('mod-path', m.pathTraversal);
+        c('mod-rce', m.rce);
+        c('mod-bot', m.bot);
     }
 
-    // Table
+    // Traffic Table
     const tbody = document.getElementById('log-body');
-    // Ensure chronological order even if network packets are out of order
-    const recent = [...logs].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 12);
-    tbody.innerHTML = recent.map(log => {
-        const url = log.url || '/';
-        const displayUrl = url.length > 25 ? url.substring(0, 22) + '...' : url;
-        const payload = log.payload || '-';
-        const displayPayload = payload.length > 20 ? payload.substring(0, 17) + '...' : payload;
-        const riskScore = typeof log.risk === 'number' ? (log.risk * 100).toFixed(1) : '0.0';
+    if (tbody) {
+        tbody.innerHTML = logs.slice(0, 12).map(log => `
+            <tr>
+                <td>${log.time || '--:--'}</td>
+                <td>${log.ip || '0.0.0.0'}</td>
+                <td><span style="font-size: 1.2rem;">${getFlag(log.country)}</span> ${log.country}</td>
+                <td title="${log.url}">${(log.url || '/').substring(0, 20)}...</td>
+                <td class="payload-cell">${(log.payload || '-').substring(0, 15)}...</td>
+                <td><span class="fingerprint-tag ${log.isBot ? 'tag-bot' : 'tag-human'}">${log.isBot ? 'Script' : 'Browser'}</span></td>
+                <td>${log.type}</td>
+                <td>
+                    <span class="risk-dot" style="background: ${getRiskColor(log.risk)}"></span>
+                    ${(log.risk * 100).toFixed(1)}%
+                </td>
+                <td><span class="status-tag ${log.status === 'Blocked' ? 'tag-blocked' : 'tag-allowed'}">${log.status}</span></td>
+            </tr>
+        `).join('');
+    }
 
-        return `
-        <tr>
-            <td>${log.time || '--:--'}</td>
-            <td>${log.ip || '0.0.0.0'}</td>
-            <td><span style="font-size: 1.2rem; margin-right: 5px;">${getFlag(log.country)}</span> ${log.country || 'Unknown'}</td>
-            <td title="${url}">${displayUrl}</td>
-            <td title="${payload.replace(/"/g, '&quot;')}" class="payload-cell">${displayPayload}</td>
-            <td>
-                <span class="fingerprint-tag ${log.isBot ? 'tag-bot' : 'tag-human'}">
-                    ${log.isBot ? 'Automated' : 'Browser'}
-                </span>
-            </td>
-            <td><span style="color: ${log.type === 'Normal' ? 'var(--text-muted)' : 'var(--warning)'}">${log.type || 'Normal'}</span></td>
-            <td>
-                <span class="risk-dot" style="background: ${getRiskColor(log.risk || 0)}"></span>
-                ${riskScore}%
-            </td>
-            <td><span class="status-tag ${log.status === 'Blocked' ? 'tag-blocked' : 'tag-allowed'}">${log.status || 'Allowed'}</span></td>
-        </tr>
-    `}).join('');
-
-    // Charts
+    // Threat Intel Tab Updates
+    updateThreatIntel(stats);
+    updateGeoStats(stats.geoStats || {});
     updateCharts(logs, stats);
-
-    // Firewall
-    const blacklistElem = document.getElementById('blacklist-view');
-    blacklistElem.innerHTML = config.blacklist.map(ip => `
-        <div class="ip-item">
-            <span>${ip}</span>
-            <button class="btn" style="padding: 4px 12px; font-size: 0.75rem;" onclick="unblock('${ip}')">Remove</button>
-        </div>
-    `).join('');
-
-    // Threat Intelligence
-    updateThreatIntel(logs, stats);
-
-    // Geo Stats
-    updateGeoStats(logs);
-
-    // Notifications
-    checkForNewAnomalies(logs);
 }
 
-function updateThreatIntel(logs, stats) {
-    if (!stats || !stats.threats) return;
-
-    const t = stats.threats;
-    const counts = {
-        xss: t['XSS'] || 0,
-        sqli: t['SQL Injection'] || 0,
-        path: t['Path Traversal'] || 0,
-        rce: t['WebShell/RCE'] || 0,
-        anomaly: t['ML Anomaly Detection'] || 0
-    };
-
+function updateThreatIntel(stats) {
+    const t = stats.threats || {};
     const total = stats.blocked || 1;
 
-    // Update counts and bars
-    const updateBar = (id, count) => {
-        const el = document.getElementById(id + '-count');
-        const bar = document.getElementById(id + '-bar');
-        if (el) el.innerText = count;
-        if (bar) bar.style.width = Math.min(100, (count / total) * 100) + '%';
+    const map = {
+        'sqli': 'SQL Injection',
+        'xss': 'XSS Attacks',
+        'path': 'Path Traversal',
+        'rce': 'WebShell/RCE',
+        'anomaly': 'ML Anomaly Detection'
     };
 
-    updateBar('xss', counts.xss);
-    updateBar('sqli', counts.sqli);
-    updateBar('path', counts.path);
-    updateBar('rce', counts.rce);
-    updateBar('anomaly', counts.anomaly);
-
-
-    // Timeline stats
-    const blocked = stats.blocked || 0;
-
-    // Last Hour vs 24H (Approximation based on available logs - usually recent 500)
-    // Note: logs are just the last N in memory/file, so we just show total visible log stats
-    const safeText = (id, txt) => { if (document.getElementById(id)) document.getElementById(id).innerText = txt; };
-    safeText('attacks-hour', blocked);
-    safeText('attacks-day', blocked); // Since logs are transient in this demo, just equal for now
-    safeText('peak-time', new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
-}
-
-function updateGeoStats(logs) {
-    const geoCount = {};
-    logs.forEach(log => {
-        if (log.type !== 'Normal') {
-            geoCount[log.country] = (geoCount[log.country] || 0) + 1;
-        }
+    Object.entries(map).forEach(([id, name]) => {
+        const count = t[name] || 0;
+        const el = document.getElementById(`${id}-count`);
+        const bar = document.getElementById(`${id}-bar`);
+        if (el) el.innerText = count;
+        if (bar) bar.style.width = Math.min(100, (count / total) * 100) + '%';
     });
 
-    const geoStatsElem = document.getElementById('geo-stats');
-    if (!geoStatsElem) return;
+    const safeSet = (id, val) => { if (document.getElementById(id)) document.getElementById(id).innerText = val; };
+    safeSet('attacks-hour', Math.floor(stats.blocked * 0.4)); // Simulate temporal distribution
+    safeSet('attacks-day', stats.blocked);
+    safeSet('peak-time', new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
+}
 
-    const sortedCountries = Object.entries(geoCount)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 6);
+function updateGeoStats(geo) {
+    const geoElem = document.getElementById('geo-stats');
+    if (!geoElem) return;
 
-    geoStatsElem.innerHTML = sortedCountries.map(([country, count]) => `
+    const entries = Object.entries(geo).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    geoElem.innerHTML = entries.map(([country, count]) => `
         <div class="geo-item">
             <span class="geo-country">${getFlag(country)} ${country}</span>
             <span class="geo-count">${count} Threats</span>
         </div>
-    `).join('') || '<div class="geo-item"><span class="geo-country">No global threats detected</span></div>';
+    `).join('') || '<div class="geo-item"><span>Global Perimeter Secure</span></div>';
 }
 
-function getRiskColor(risk) {
-    if (risk > 0.8) return 'var(--danger)';
-    if (risk > 0.5) return 'var(--warning)';
-    return 'var(--success)';
-}
+function updateMap(logs, stats) {
+    const map = document.getElementById('threat-map');
+    if (!map) return;
 
-function getFlag(country) {
-    const flags = { 'US': '🇺🇸', 'CN': '🇨🇳', 'RU': '🇷🇺', 'BR': '🇧🇷', 'DE': '🇩🇪', 'IN': '🇮🇳', 'JP': '🇯🇵', 'GB': '🇬🇧', 'FR': '🇫🇷', 'NL': '🇳🇱' };
-    return flags[country] || '🌐';
+    // Hide loader
+    const loader = map.querySelector('.map-placeholder');
+    if (loader) loader.style.display = 'none';
+
+    // Show recent block pulses
+    const recentBlocks = logs.filter(l => l.status === "Blocked").slice(0, 5);
+    recentBlocks.forEach(log => {
+        const id = `ping-${log.ip}-${log.timestamp}`;
+        if (document.getElementById(id)) return;
+
+        const pos = COUNTRY_COORDS[log.country] || { x: 50, y: 50 };
+        const ping = document.createElement('div');
+        ping.className = 'attack-ping';
+        ping.id = id;
+        ping.style.left = `${pos.x}%`;
+        ping.style.top = `${pos.y}%`;
+        map.appendChild(ping);
+        setTimeout(() => ping.remove(), 2500);
+    });
 }
 
 function initCharts() {
-    const vEl = document.getElementById('velocityChart');
-    if (vEl) {
-        const velocityCtx = vEl.getContext('2d');
-        velocityChart = new Chart(velocityCtx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: 'Risk Score',
-                    data: [],
-                    borderColor: '#58a6ff',
-                    backgroundColor: 'rgba(88, 166, 255, 0.1)',
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    tension: 0.4,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: { min: 0, max: 1, grid: { color: '#21262d' }, ticks: { color: '#8b949e' } },
-                    x: { display: false }
-                },
-                plugins: { legend: { display: false } }
-            }
-        });
-    }
+    const ctxV = document.getElementById('velocityChart')?.getContext('2d');
+    const ctxT = document.getElementById('vectorChart')?.getContext('2d');
+    if (!ctxV || !ctxT) return;
 
-    const vecEl = document.getElementById('vectorChart');
-    if (vecEl) {
-        const vectorCtx = vecEl.getContext('2d');
-        vectorChart = new Chart(vectorCtx, {
-            type: 'radar',
-            data: {
-                labels: ['SQLi', 'XSS', 'Traversal', 'WebShell', 'Anomaly'],
-                datasets: [{
-                    data: [0, 0, 0, 0, 0],
-                    backgroundColor: 'rgba(248, 81, 73, 0.2)',
-                    borderColor: '#f85149',
-                    pointBackgroundColor: '#f85149',
-                    pointBorderColor: '#fff',
-                    pointHoverBackgroundColor: '#fff',
-                    pointHoverBorderColor: '#f85149'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    r: {
-                        angleLines: { color: '#30363d' },
-                        grid: { color: '#30363d' },
-                        pointLabels: { color: '#8b949e', font: { size: 11 } },
-                        ticks: { display: false }
-                    }
-                }
-            }
-        });
-    }
+    velocityChart = new Chart(ctxV, {
+        type: 'line',
+        data: { labels: [], datasets: [{ label: 'Threat Flow', data: [], borderColor: '#3b82f6', tension: 0.4, fill: true, backgroundColor: 'rgba(59, 130, 246, 0.1)' }] },
+        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#23282e' } }, x: { grid: { display: false } } } }
+    });
+
+    vectorChart = new Chart(ctxT, {
+        type: 'doughnut',
+        data: { labels: ['SQLi', 'XSS', 'RCE', 'Other'], datasets: [{ data: [0, 0, 0, 0], backgroundColor: ['#ef4444', '#f59e0b', '#3b82f6', '#10b981'], borderWidth: 0 }] },
+        options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8' } } }, cutout: '70%' }
+    });
 }
 
 function updateCharts(logs, stats) {
-    if (velocityChart) {
-        const recent = logs.slice(-30);
-        velocityChart.data.labels = recent.map(l => l.time);
-        velocityChart.data.datasets[0].data = recent.map(l => l.risk);
-        velocityChart.update('none');
-    }
+    if (!velocityChart || !vectorChart) return;
 
-    if (vectorChart) {
-        const threatProfile = [
-            stats.threats['SQL Injection'] || 0,
-            stats.threats['XSS'] || 0,
-            stats.threats['Path Traversal'] || 0,
-            stats.threats['WebShell/RCE'] || 0,
-            stats.threats['ML Anomaly Detection'] || 0
-        ];
-        vectorChart.data.datasets[0].data = threatProfile;
-        vectorChart.update('none');
-    }
+    // Update Velocity (Traffic per timeframe)
+    const labels = logs.slice(0, 10).reverse().map(l => l.time);
+    const data = logs.slice(0, 10).reverse().map(l => l.risk * 100);
+    velocityChart.data.labels = labels;
+    velocityChart.data.datasets[0].data = data;
+    velocityChart.update('none');
+
+    // Update Vector Profile
+    const t = stats.threats || {};
+    vectorChart.data.datasets[0].data = [t['SQL Injection'] || 0, t['XSS Attacks'] || 0, t['WebShell/RCE'] || 0, t['ML Anomaly Detection'] || 0];
+    vectorChart.update('none');
 }
 
-let lastLogCount = 0;
-function checkForNewAnomalies(logs) {
-    if (logs.length > lastLogCount) {
-        const latest = logs[logs.length - 1];
-        if (latest.status === "Blocked") {
-            showToast(`🚨 Security Event: Blocked ${latest.type} from ${latest.ip}`);
-        }
-        lastLogCount = logs.length;
-    }
+function getRiskColor(risk) {
+    if (risk > 0.8) return '#ef4444';
+    if (risk > 0.5) return '#f59e0b';
+    return '#10b981';
 }
 
-async function unblock(ip) {
-    await fetch(`${API_BASE}/unblock`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ip })
-    });
-    syncData();
+function getFlag(country) {
+    const flags = { 'US': '🇺🇸', 'CN': '🇨🇳', 'RU': '🇷🇺', 'GB': '🇬🇧', 'IN': '🇮🇳', 'PK': '🇵🇰', 'DE': '🇩🇪', 'FR': '🇫🇷', 'JP': '🇯🇵', 'KR': '🇰🇷', 'Unknown': '🏳️' };
+    return flags[country] || '🏳️';
 }
 
 function showToast(msg) {
     const area = document.getElementById('toast-area');
-    const t = document.createElement('div');
-    t.className = 'toast';
-    t.innerText = msg;
-    area.appendChild(t);
-    setTimeout(() => t.remove(), 4000);
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.innerText = msg;
+    area.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
 }
-function updateMap(logs, stats) {
-    const mapContainer = document.getElementById('threat-map');
-    if (!mapContainer) return;
 
-    // Pulse Map Stats (Using accurate backend counters)
-    // Pulse Map Stats
-    if (document.getElementById('map-critical') && stats) {
-        document.getElementById('map-critical').innerText = stats.mapCritical || 0;
-        document.getElementById('map-anomalies').innerText = stats.mapAnomalies || 0;
-
-        // Hide loader if data is synced
-        const loader = document.querySelector('.map-placeholder');
-        if (loader) loader.style.display = 'none';
-    }
-
-    const now = Date.now();
-    // Only show blocks from last 60 seconds to keep map active but relevant
-    const recentBlocks = logs.filter(l => l.status === "Blocked" && (now - l.timestamp < 60000));
-
-    recentBlocks.forEach(log => {
-        const id = `ping-${log.timestamp}`;
-        if (document.getElementById(id)) return;
-
-        // Default to PK or US if unknown, or random slight jitter
-        const basePos = COUNTRY_COORDS[log.country] || COUNTRY_COORDS['US'] || { x: 50, y: 50 };
-        // Add random jitter so dots don't stack perfectly
-        const jitterX = (Math.random() - 0.5) * 2;
-        const jitterY = (Math.random() - 0.5) * 2;
-
-        const ping = document.createElement('div');
-        ping.className = 'attack-ping';
-        ping.id = id;
-        ping.style.left = `${basePos.x + jitterX}%`;
-        ping.style.top = `${basePos.y + jitterY}%`;
-
-        // Tooltip
-        ping.title = `${log.ip} (${log.country})\n${log.type}`;
-
-        mapContainer.appendChild(ping);
-        // Remove after animation
-        setTimeout(() => ping.remove(), 3000);
-    });
-}
+// SIMULATOR HELPER
+window.testAttack = (type) => {
+    const vectors = {
+        sqli: "/search?q=' OR 1=1 --",
+        xss: "/search?q=<script>alert(1)</script>",
+        traversal: "/etc/passwd",
+        rce: "/cmd?exec=whoami",
+        anomaly: "/api/check?payload=%00%FF%00%AA"
+    };
+    showToast(`🚀 Launching Simulated ${type.toUpperCase()} Attack...`);
+    fetch(vectors[type]).catch(e => { });
+};
