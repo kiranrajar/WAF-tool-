@@ -383,32 +383,41 @@ function updateMap(logs, stats) {
     if (!mapContainer) return;
 
     // Pulse Map Stats (Using accurate backend counters)
+    // Pulse Map Stats
     if (document.getElementById('map-critical') && stats) {
         document.getElementById('map-critical').innerText = stats.mapCritical || 0;
         document.getElementById('map-anomalies').innerText = stats.mapAnomalies || 0;
-        // Hide loader if data is present
-        const loader = document.querySelector('.map-loader');
+
+        // Hide loader if data is synced
+        const loader = document.querySelector('.map-placeholder');
         if (loader) loader.style.display = 'none';
-        // Or if map text is just static, hide it
-        const mapText = document.querySelector('.map-overlay-text');
-        if (mapText) mapText.style.display = 'none';
     }
 
     const now = Date.now();
-    const recentBlocks = logs.filter(l => l.status === "Blocked" && (now - l.timestamp < 15000));
+    // Only show blocks from last 60 seconds to keep map active but relevant
+    const recentBlocks = logs.filter(l => l.status === "Blocked" && (now - l.timestamp < 60000));
 
     recentBlocks.forEach(log => {
         const id = `ping-${log.timestamp}`;
         if (document.getElementById(id)) return;
 
-        const pos = COUNTRY_COORDS[log.country] || COUNTRY_COORDS['US'];
+        // Default to PK or US if unknown, or random slight jitter
+        const basePos = COUNTRY_COORDS[log.country] || COUNTRY_COORDS['US'] || { x: 50, y: 50 };
+        // Add random jitter so dots don't stack perfectly
+        const jitterX = (Math.random() - 0.5) * 2;
+        const jitterY = (Math.random() - 0.5) * 2;
+
         const ping = document.createElement('div');
         ping.className = 'attack-ping';
         ping.id = id;
-        ping.style.left = `${pos.x}%`;
-        ping.style.top = `${pos.y}%`;
+        ping.style.left = `${basePos.x + jitterX}%`;
+        ping.style.top = `${basePos.y + jitterY}%`;
+
+        // Tooltip
+        ping.title = `${log.ip} (${log.country})\n${log.type}`;
 
         mapContainer.appendChild(ping);
-        setTimeout(() => ping.remove(), 2500);
+        // Remove after animation
+        setTimeout(() => ping.remove(), 3000);
     });
 }
