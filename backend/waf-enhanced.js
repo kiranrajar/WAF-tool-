@@ -9,7 +9,7 @@ const useragent = require('express-useragent');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const mongoose = require('mongoose');
 const rateLimit = require('express-rate-limit');
-const { Log, Blacklist, Reputation } = require('./models');
+const { Log, Blacklist, Reputation, Config } = require('./models');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -58,24 +58,37 @@ const BLACKLIST_FILE = path.join(DATA_DIR, 'blacklist.json');
 const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
 
 // Initialize files if not exists (or copy to /tmp in Vercel)
-function initDataFiles() {
+const DEFAULT_CONFIG = {
+    blockedCountries: ['CN', 'RU', 'KP'],
+    rateLimit: 100,
+    riskThreshold: 0.88,
+    protectionMode: 'blocking',
+    targetUrl: 'http://books.toscrape.com',
+    modules: {
+        sqli: true,
+        xss: true,
+        pathTraversal: true,
+        rce: true,
+        bot: true
+    }
+};
+
+async function initDataFiles() {
     if (!fs.existsSync(LOG_FILE)) fs.writeFileSync(LOG_FILE, JSON.stringify([]));
     if (!fs.existsSync(BLACKLIST_FILE)) fs.writeFileSync(BLACKLIST_FILE, JSON.stringify([]));
-    if (!fs.existsSync(CONFIG_FILE)) {
-        fs.writeFileSync(CONFIG_FILE, JSON.stringify({
-            blockedCountries: ['CN', 'RU', 'KP'],
-            rateLimit: 100,
-            riskThreshold: 0.88,
-            protectionMode: 'blocking',
-            targetUrl: 'http://books.toscrape.com',
-            modules: {
-                sqli: true,
-                xss: true,
-                pathTraversal: true,
-                rce: true,
-                bot: true
+
+    if (MONGODB_URI) {
+        try {
+            const exists = await Config.findOne({ id: 'global' });
+            if (!exists) {
+                await Config.create({ id: 'global', ...DEFAULT_CONFIG });
+                console.log("✅ Initialized Default Config in MongoDB");
             }
-        }));
+        } catch (e) { console.error("DB Init Error:", e); }
+    }
+
+    if (!fs.existsSync(CONFIG_FILE)) {
+        fs.writeFileSync(CONFIG_FILE, JSON.stringify(DEFAULT_CONFIG));
     }
 }
 
@@ -232,9 +245,14 @@ app.use(async (req, res, next) => {
     // If testing locally (::1), map to a random public IP for testing geo features, else keep it
     const cleanIp = (ip === '::1' || ip === '127.0.0.1') ? '103.244.175.10' : ip.replace('::ffff:', ''); // 103... is a Pakistan IP example for testing
 
-    let config = { blockedCountries: [], riskThreshold: 0.88, protectionMode: 'blocking' };
+    let config = DEFAULT_CONFIG;
     try {
-        if (fs.existsSync(CONFIG_FILE)) config = JSON.parse(fs.readFileSync(CONFIG_FILE));
+        if (MONGODB_URI) {
+            const dbConfig = await Config.findOne({ id: 'global' }).lean();
+            if (dbConfig) config = dbConfig;
+        } else if (fs.existsSync(CONFIG_FILE)) {
+            config = JSON.parse(fs.readFileSync(CONFIG_FILE));
+        }
     } catch (e) { }
 
     // Country Detection: Vercel Header -> GeoIP -> Default
@@ -465,9 +483,10 @@ app.get('/api/stats', async (req, res) => {
         if (MONGODB_URI) {
             logs = await Log.find().lean();
             blacklist = await Blacklist.find().lean();
-            if (fs.existsSync(CONFIG_FILE)) config = JSON.parse(fs.readFileSync(CONFIG_FILE));
+            const dbConfig = await Config.findOne({ id: 'global' }).lean();
+            config = dbConfig || DEFAULT_CONFIG;
         } else {
-            initDataFiles(); // Ensure files exist
+            await initDataFiles(); // Ensure files exist
             logs = JSON.parse(fs.readFileSync(LOG_FILE, 'utf8'));
             blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE, 'utf8'));
             config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
@@ -517,14 +536,17 @@ app.get('/api/logs', async (req, res) => {
 
 app.get('/api/config', async (req, res) => {
     try {
-        initDataFiles();
-        const config = JSON.parse(fs.readFileSync(CONFIG_FILE));
+        await initDataFiles();
+        let config = DEFAULT_CONFIG;
         let blacklistIps = [];
 
         if (MONGODB_URI) {
+            const dbConfig = await Config.findOne({ id: 'global' }).lean();
+            if (dbConfig) config = dbConfig;
             const bl = await Blacklist.find().lean();
             blacklistIps = bl.map(b => b.ip);
         } else {
+            if (fs.existsSync(CONFIG_FILE)) config = JSON.parse(fs.readFileSync(CONFIG_FILE));
             const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
             blacklistIps = blacklist.map(b => b.ip);
         }
@@ -537,7 +559,11 @@ app.post('/api/config', async (req, res) => {
         const newConfig = req.body;
         console.log("⚙️  Received Configuration Update:", JSON.stringify(newConfig));
 
-        fs.writeFileSync(CONFIG_FILE, JSON.stringify(newConfig, null, 2));
+        if (MONGODB_URI) {
+            await Config.updateOne({ id: 'global' }, { $set: newConfig }, { upsert: true });
+        } else {
+            fs.writeFileSync(CONFIG_FILE, JSON.stringify(newConfig, null, 2));
+        }
 
         // If there's blacklist in body and we have DB, sync it
         if (newConfig.blacklist && MONGODB_URI) {
@@ -546,7 +572,7 @@ app.post('/api/config', async (req, res) => {
             }
         }
 
-        res.json({ success: true, message: "Configuration saved to disk" });
+        res.json({ success: true, message: "Configuration saved successfully" });
     } catch (e) {
         console.error("Config Save Error:", e);
         res.status(500).send("Write Error");

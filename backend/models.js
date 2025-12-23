@@ -29,8 +29,25 @@ const reputationSchema = new mongoose.Schema({
     lastUpdate: { type: Number, default: Date.now }
 });
 
+const configSchema = new mongoose.Schema({
+    id: { type: String, default: 'global' },
+    targetUrl: String,
+    rateLimit: Number,
+    riskThreshold: Number,
+    blockedCountries: [String],
+    protectionMode: String,
+    modules: {
+        sqli: Boolean,
+        xss: Boolean,
+        pathTraversal: Boolean,
+        rce: Boolean,
+        bot: Boolean
+    }
+});
+
 module.exports = {
     Log: mongoose.model('Log', logSchema),
     Blacklist: mongoose.model('Blacklist', blacklistSchema),
-    Reputation: mongoose.model('Reputation', reputationSchema)
+    Reputation: mongoose.model('Reputation', reputationSchema),
+    Config: mongoose.model('Config', configSchema)
 };
