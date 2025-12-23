@@ -286,7 +286,7 @@ function updateUI(logs, stats, syncInputs) {
     `).join('');
 
     // Threat Intelligence
-    updateThreatIntel(logs);
+    updateThreatIntel(logs, stats);
 
     // Geo Stats
     updateGeoStats(logs);
@@ -295,20 +295,19 @@ function updateUI(logs, stats, syncInputs) {
     checkForNewAnomalies(logs);
 }
 
-function updateThreatIntel(logs) {
-    const counts = { xss: 0, sqli: 0, path: 0, rce: 0, anomaly: 0 };
+function updateThreatIntel(logs, stats) {
+    if (!stats || !stats.threats) return;
 
-    if (logs && logs.length > 0) {
-        logs.forEach(l => {
-            if (l.type.includes('XSS')) counts.xss++;
-            else if (l.type.includes('SQL')) counts.sqli++;
-            else if (l.type.includes('Traversal')) counts.path++;
-            else if (l.type.includes('Command') || l.type.includes('RCE')) counts.rce++;
-            else if (l.type.includes('Anomaly')) counts.anomaly++;
-        });
-    }
+    const t = stats.threats;
+    const counts = {
+        xss: t['XSS'] || 0,
+        sqli: t['SQL Injection'] || 0,
+        path: t['Path Traversal'] || 0,
+        rce: t['WebShell/RCE'] || 0,
+        anomaly: t['ML Anomaly Detection'] || 0
+    };
 
-    const total = (logs && logs.length) || 1;
+    const total = stats.blocked || 1;
 
     // Update counts and bars
     const updateBar = (id, count) => {
@@ -325,7 +324,7 @@ function updateThreatIntel(logs) {
 
 
     // Timeline stats
-    const blocked = logs.filter(l => l.status === 'Blocked' || l.status === 'Dropped (Stealth)').length;
+    const blocked = stats.blocked || 0;
 
     // Last Hour vs 24H (Approximation based on available logs - usually recent 500)
     // Note: logs are just the last N in memory/file, so we just show total visible log stats

@@ -481,40 +481,49 @@ app.use('/', limiter, (req, res, next) => {
 app.get('/api/stats', async (req, res) => {
     try {
         let logs = [], blacklist = [], config = {};
+        let total = 0, blocked = 0, mapCritical = 0, mapAnomalies = 0;
+        let threats = { 'SQL Injection': 0, 'XSS': 0, 'Path Traversal': 0, 'WebShell/RCE': 0, 'ML Anomaly Detection': 0 };
 
-        if (MONGODB_URI) {
-            logs = await Log.find().lean();
-            blacklist = await Blacklist.find().lean();
+        if (MONGODB_URI && mongoose.connection.readyState === 1) {
+            // High-performance counts
+            total = await Log.countDocuments();
+            blocked = await Log.countDocuments({ status: "Blocked" });
+            mapCritical = await Log.countDocuments({ status: "Blocked", risk: { $gte: 0.8 } });
+            mapAnomalies = await Log.countDocuments({ status: "Blocked", risk: { $lt: 0.8 } });
+
+            // Get threat breakdown
+            const threatStats = await Log.aggregate([
+                { $match: { type: { $ne: "Normal" } } },
+                { $group: { _id: "$type", count: { $sum: 1 } } }
+            ]);
+            threatStats.forEach(t => { threats[t._id] = t.count; });
+
+            const bl = await Blacklist.find().lean();
+            blacklist = bl;
             const dbConfig = await Config.findOne({ id: 'global' }).lean();
             config = dbConfig || DEFAULT_CONFIG;
+
+            // Getting last 50 for the timeline velocity graph
+            logs = await Log.find().sort({ timestamp: -1 }).limit(50);
         } else {
-            await initDataFiles(); // Ensure files exist
+            await initDataFiles();
             logs = JSON.parse(fs.readFileSync(LOG_FILE, 'utf8'));
             blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE, 'utf8'));
             config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+            total = logs.length;
+            blocked = logs.filter(l => l.status === "Blocked").length;
+            mapCritical = logs.filter(l => l.status === "Blocked" && l.risk >= 0.8).length;
+            mapAnomalies = logs.filter(l => l.status === "Blocked" && l.risk < 0.8).length;
+            logs.forEach(l => { if (l.type !== "Normal") threats[l.type] = (threats[l.type] || 0) + 1; });
         }
 
-        const blocked = logs.filter(l => l.status === "Blocked").length;
-
-        // Accurate Map Stats calculated from full historical logs
-        const mapCritical = logs.filter(l => l.status === "Blocked" && (l.risk >= 0.8 || (l.type && l.type.includes('Honeypot')))).length;
-        const mapAnomalies = logs.filter(l => l.status === "Blocked" && (l.risk < 0.8 && (!l.type || !l.type.includes('Honeypot')))).length;
-
-        const threats = logs.reduce((acc, l) => {
-            if (l.type !== "Normal") acc[l.type] = (acc[l.type] || 0) + 1;
-            return acc;
-        }, {});
-
         res.json({
-            total: logs.length,
-            blocked,
-            allowed: logs.length - blocked,
+            total, blocked, allowed: total - blocked,
             avgRisk: logs.length > 0 ? logs.reduce((acc, l) => acc + l.risk, 0) / logs.length : 0,
-            threats,
-            mapCritical,
-            mapAnomalies,
+            threats, mapCritical, mapAnomalies,
             blacklistCount: blacklist.length,
-            config
+            config,
+            recentLogs: logs // Send small slice for charts
         });
     } catch (err) {
         console.error(err);
