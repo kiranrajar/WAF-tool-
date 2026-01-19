@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SYNAPSE - Test Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+            color: #00ffaa;
+            padding: 40px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid #00ffaa;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 0 30px rgba(0, 255, 170, 0.3);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 0 0 20px #00ffaa;
+            font-size: 2.5rem;
+        }
+
+        .test-section {
+            background: rgba(0, 20, 40, 0.8);
+            border: 1px solid #00ffaa44;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .test-section h2 {
+            color: #00ffaa;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+
+        button {
+            background: linear-gradient(135deg, #00ffaa 0%, #00cc88 100%);
+            color: #0a0e27;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 255, 170, 0.5);
+        }
+
+        .result {
+            background: rgba(0, 0, 0, 0.5);
+            border-left: 3px solid #00ffaa;
+            padding: 15px;
+            margin-top: 15px;
+            font-size: 0.9rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .status.blocked {
+            background: #ff0055;
+            color: white;
+        }
+
+        .status.allowed {
+            background: #00ffaa;
+            color: #0a0e27;
+        }
+
+        #liveStats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: rgba(0, 255, 170, 0.1);
+            border: 1px solid #00ffaa44;
+            border-radius: 6px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #00ffaa;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🛡️ SYNAPSE Neural Defense - Test Suite</h1>
+
+        <div id="liveStats">
+            <div class="stat-card">
+                <div class="stat-value" id="stat-total">0</div>
+                <div class="stat-label">Total Requests</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-blocked">0</div>
+                <div class="stat-label">Blocked Threats</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-allowed">0</div>
+                <div class="stat-label">Allowed</div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🧪 Test 1: Path Traversal Attack</h2>
+            <p>Simulates an attacker trying to access system files.</p>
+            <button onclick="testPathTraversal()">🚀 Launch Attack</button>
+            <div class="result" id="result1"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🧪 Test 2: SQL Injection</h2>
+            <p>Tests the Neural Logic engine's ability to detect database exploits.</p>
+            <button onclick="testSQLInjection()">🚀 Launch Attack</button>
+            <div class="result" id="result2"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🧪 Test 3: XSS (Cross-Site Scripting)</h2>
+            <p>Attempts to inject malicious JavaScript code.</p>
+            <button onclick="testXSS()">🚀 Launch Attack</button>
+            <div class="result" id="result3"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🧪 Test 4: Honeytoken Trap</h2>
+            <p>Tests the deception layer by accessing a hidden trap URL.</p>
+            <button onclick="testHoneytoken()">🚀 Trigger Trap</button>
+            <div class="result" id="result4"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🧪 Test 5: Normal Request (Should Pass)</h2>
+            <p>A legitimate request that should be allowed.</p>
+            <button onclick="testNormal()">✅ Send Clean Request</button>
+            <div class="result" id="result5"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 Recent Traffic Logs</h2>
+            <button onclick="fetchLogs()">🔄 Refresh Logs</button>
+            <div class="result" id="logs"></div>
+        </div>
+    </div>
+
+    <script>
+        async function updateStats() {
+            try {
+                const res = await fetch('/api/stats');
+                const data = await res.json();
+                document.getElementById('stat-total').textContent = data.total || 0;
+                document.getElementById('stat-blocked').textContent = data.blocked || 0;
+                document.getElementById('stat-allowed').textContent = data.allowed || 0;
+            } catch (e) {
+                console.error('Stats error:', e);
+            }
+        }
+
+        async function testPathTraversal() {
+            const result = document.getElementById('result1');
+            result.innerHTML = '⏳ Testing...';
+            try {
+                const res = await fetch('/etc/passwd');
+                const text = await res.text();
+                const status = res.status === 403 ? '<span class="status blocked">BLOCKED ✓</span>' : '<span class="status allowed">ALLOWED ✗</span>';
+                result.innerHTML = `Status: ${res.status} ${status}<br><br>Response:<br>${text.substring(0, 500)}`;
+            } catch (e) {
+                result.innerHTML = `Error: ${e.message}`;
+            }
+            updateStats();
+        }
+
+        async function testSQLInjection() {
+            const result = document.getElementById('result2');
+            result.innerHTML = '⏳ Testing...';
+            try {
+                const res = await fetch("/search?query=' OR 1=1 --");
+                const text = await res.text();
+                const status = res.status === 403 ? '<span class="status blocked">BLOCKED ✓</span>' : '<span class="status allowed">ALLOWED ✗</span>';
+                result.innerHTML = `Status: ${res.status} ${status}<br><br>Response:<br>${text.substring(0, 500)}`;
+            } catch (e) {
+                result.innerHTML = `Error: ${e.message}`;
+            }
+            updateStats();
+        }
+
+        async function testXSS() {
+            const result = document.getElementById('result3');
+            result.innerHTML = '⏳ Testing...';
+            try {
+                const res = await fetch('/?name=<script>alert(1)</script>');
+    const text = await res.text();
+    const status = res.status === 403 ? '<span class="status blocked">BLOCKED ✓</span>' : '<span
+        class="status allowed">ALLOWED ✗</span>';
+    result.innerHTML = `Status: ${res.status} ${status}<br><br>Response:<br>${text.substring(0, 500)}`;
+    } catch (e) {
+    result.innerHTML = `Error: ${e.message}`;
+    }
+    updateStats();
+    }
+
+    async function testHoneytoken() {
+    const result = document.getElementById('result4');
+    result.innerHTML = '⏳ Testing...';
+    try {
+    const res = await fetch('/admin_setup');
+    const text = await res.text();
+    const status = res.status === 403 ? '<span class="status blocked">BLOCKED ✓</span>' : '<span
+        class="status allowed">ALLOWED ✗</span>';
+    result.innerHTML = `Status: ${res.status} ${status}<br><br>Response:<br>${text.substring(0, 500)}`;
+    } catch (e) {
+    result.innerHTML = `Error: ${e.message}`;
+    }
+    updateStats();
+    }
+
+    async function testNormal() {
+    const result = document.getElementById('result5');
+    result.innerHTML = '⏳ Testing...';
+    try {
+    const res = await fetch('/');
+    const text = await res.text();
+    const status = res.status === 200 ? '<span class="status allowed">ALLOWED ✓</span>' : '<span
+        class="status blocked">BLOCKED ✗</span>';
+    result.innerHTML = `Status: ${res.status} ${status}<br><br>Response preview:<br>${text.substring(0, 300)}...`;
+    } catch (e) {
+    result.innerHTML = `Error: ${e.message}`;
+    }
+    updateStats();
+    }
+
+    async function fetchLogs() {
+    const result = document.getElementById('logs');
+    result.innerHTML = '⏳ Loading...';
+    try {
+    const res = await fetch('/api/stats');
+    const data = await res.json();
+    if (data.recentLogs && data.recentLogs.length > 0) {
+    let html = '<table style="width:100%; border-collapse: collapse;">';
+        html += '<tr style="border-bottom: 1px solid #00ffaa44;">
+            <th>Time</th>
+            <th>IP</th>
+            <th>Type</th>
+            <th>Risk</th>
+            <th>Status</th>
+        </tr>';
+        data.recentLogs.slice(0, 10).forEach(log => {
+        const statusClass = log.status === 'Blocked' ? 'blocked' : 'allowed';
+        html += `<tr style="border-bottom: 1px solid #00ffaa22;">
+            <td>${log.time}</td>
+            <td>${log.ip}</td>
+            <td>${log.type}</td>
+            <td>${(log.risk * 100).toFixed(0)}%</td>
+            <td><span class="status ${statusClass}">${log.status}</span></td>
+        </tr>`;
+        });
+        html += '</table>';
+    result.innerHTML = html;
+    } else {
+    result.innerHTML = '📡 No logs yet. Try running some tests above.';
+    }
+    } catch (e) {
+    result.innerHTML = `Error: ${e.message}`;
+    }
+    }
+
+    // Auto-update stats every 3 seconds
+    updateStats();
+    setInterval(updateStats, 3000);
+    </script>
+</body>
+
+</html>
