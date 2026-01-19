@@ -119,8 +119,36 @@ function updateRiskValue(val) {
 }
 
 async function syncThreatFeeds() {
-    alert("🔄 Triggering Global Threat Feed Sync...");
-    // Future: Call API to trigger backend sync
+    alert("🔄 SYNAPSE Neural Sync: Initiating global threat data harvest...");
+}
+
+function toggleSystem() {
+    alert("📡 Neural Link Toggled: Manual override engaged.");
+}
+
+async function runSimulation() {
+    const payloads = [
+        { name: 'XSS Breach', url: '/search?q=<script>alert("XSS")</script>' },
+        { name: 'SQL Injection', url: '/api/users?id=1 OR 1=1' },
+        { name: 'Path Traversal', url: '/../../etc/passwd' },
+        { name: 'RCE Attempt', url: '/api/exec?cmd=rm -rf /' },
+        { name: 'Schema Violation', url: '/api/login', body: { username: 123, password: 'password' } }
+    ];
+
+    alert("⚔️ Attack Simulator: Launching neural pressure test...");
+
+    for (const p of payloads) {
+        try {
+            await fetch(p.url, {
+                method: p.body ? 'POST' : 'GET',
+                headers: { 'Content-Type': 'application/json' },
+                body: p.body ? JSON.stringify(p.body) : null
+            });
+            console.log(`Simulated: ${p.name}`);
+        } catch (e) { }
+    }
+
+    setTimeout(fetchStats, 1000);
 }
 
 // Initial Sync
