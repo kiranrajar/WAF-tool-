@@ -11,6 +11,12 @@ const mongoose = require('mongoose');
 const rateLimit = require('express-rate-limit');
 const { Log, Blacklist, Reputation, Config } = require('./models');
 
+// Industry-Grade Modular Core
+const AIEngine = require('./core/ai-engine');
+const MultiLayerInspector = require('./core/osi-layer');
+const threatIntelligence = require('./intelligence/threat-feeds');
+
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const TARGET_URL = process.env.TARGET_URL || 'http://localhost:5000'; // Default to our target app
@@ -75,8 +81,11 @@ const DEFAULT_CONFIG = {
 
 async function initDataFiles() {
     try {
-        if (!fs.existsSync(LOG_FILE)) fs.writeFileSync(LOG_FILE, JSON.stringify([]));
+        if (!fs.existsSync(LOG_FILE)) fs.writeFileSync(LOG_FILE, ""); // Initialize as empty file
         if (!fs.existsSync(BLACKLIST_FILE)) fs.writeFileSync(BLACKLIST_FILE, JSON.stringify([]));
+
+        // Sync with global threat databases on startup (Commercial feature)
+        threatIntelligence.synchronize();
 
         if (MONGODB_URI && mongoose.connection.readyState === 1) {
             const exists = await Config.findOne({ id: 'global' });
@@ -93,6 +102,7 @@ async function initDataFiles() {
         console.warn("Init Files Warning:", e.message);
     }
 }
+
 
 
 initDataFiles();
@@ -164,87 +174,26 @@ function getBlockPage(ip, reason, incidentId) {
     `;
 }
 
-// Attack signatures
-const SIGNATURES = {
-    'SQL Injection': [/UNION\s+SELECT/i, /OR\s+1=1/i, /admin'--/i, /DROP\s+TABLE/i, /SLEEP\(\d+\)/i, /BENCHMARK\(/i, /information_schema/i],
-    'XSS': [/<script.*?>/i, /javascript:/i, /onerror=/i, /onload=/i, /eval\(/i, /alert\(/i, /document\.cookie/i],
-    'Path Traversal': [/\.\.\//, /%2e%2e%2f/i, /\/etc\/passwd/i, /\/windows\/system32/i, /boot\.ini/i],
-    'WebShell/RCE': [/cmd\.exe/i, /bin\/sh/i, /bin\/bash/i, /passthru\(/i, /exec\(/i, /system\(/i, /shell_exec\(/i]
-};
-
-function calculateEntropy(text) {
-    if (!text) return 0;
-    const len = text.length;
-    const freq = {};
-    for (const char of text) freq[char] = (freq[char] || 0) + 1;
-    let entropy = 0;
-    for (const char in freq) {
-        const p = freq[char] / len;
-        entropy -= p * Math.log2(p);
-    }
-    return entropy;
-}
-
-function extractFeatures(req) {
-    const payload = req.url + JSON.stringify(req.body || "") + JSON.stringify(req.query || "");
-    const decoded = decodeURIComponent(payload);
-    const length = decoded.length;
-    const specCount = (decoded.match(/[',<>"();[\]{}!@#$%^&*+-=/\\|_]/g) || []).length;
-    const specDensity = length > 0 ? specCount / length : 0;
-
-    let sqli = 0, xss = 0, trauma = 0, rce = 0;
-    SIGNATURES['SQL Injection'].forEach(p => { if (p.test(decoded)) sqli++; });
-    SIGNATURES['XSS'].forEach(p => { if (p.test(decoded)) xss++; });
-    SIGNATURES['Path Traversal'].forEach(p => { if (p.test(decoded)) trauma++; });
-    SIGNATURES['WebShell/RCE'].forEach(p => { if (p.test(decoded)) rce++; });
-
-    const encodedChars = (payload.match(/%/g) || []).length;
-    const entropy = calculateEntropy(decoded);
-
-    return [length, specDensity, sqli + trauma, xss + rce, encodedChars, entropy];
-}
-
-// Bot Detection Fingerprinting
-function getFingerprintRisk(req) {
-    let risk = 0;
-    const ua = req.headers['user-agent'] || '';
-
-    // 1. Check for common headless browser markers
-    if (ua.includes('Headless') || ua.includes('Puppeteer') || ua.includes('Playwright')) risk += 0.5;
-
-    // 2. Check for missing common headers usually present in real browsers
-    if (!req.headers['accept-language']) risk += 0.2;
-    if (!req.headers['accept']) risk += 0.1;
-
-    // 3. Check for scripting languages as browsers
-    if (ua.includes('python-requests') || ua.includes('Go-http-client') || ua.includes('node-fetch')) risk += 0.4;
-
-    return risk;
-}
+// Core WAF Engine (Global Inspection)
 
 async function logRequest(logData) {
     try {
-        if (MONGODB_URI) {
-            await Log.create({
-                time: new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Karachi' }),
-                timestamp: Date.now(),
-                ...logData
-            });
+        const timestamp = Date.now();
+        const timeStr = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Karachi' });
+        const fullLog = { time: timeStr, timestamp, ...logData };
+
+        if (MONGODB_URI && mongoose.connection.readyState === 1) {
+            await Log.create(fullLog);
         } else {
-            // Re-read file to ensure we have latest data (in case of concurrent lambdas, though loose consistency)
-            let logs = [];
-            if (fs.existsSync(LOG_FILE)) {
-                logs = JSON.parse(fs.readFileSync(LOG_FILE));
-            }
-            logs.push({ time: new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Karachi' }), timestamp: Date.now(), ...logData });
-            if (logs.length > 500) logs.shift();
-            fs.writeFileSync(LOG_FILE, JSON.stringify(logs, null, 2));
+            // Use append-only NDJSON for robustness
+            fs.appendFileSync(LOG_FILE, JSON.stringify(fullLog) + '\n');
         }
     } catch (err) {
         console.error('Error logging:', err);
     }
 }
 
+// Core WAF Engine (Global Inspection)
 // Core WAF Engine (Global Inspection)
 app.use(async (req, res, next) => {
     // 0. Skip WAF for exactly dashboard assets and internal control APIs
@@ -256,170 +205,117 @@ app.use(async (req, res, next) => {
         return next();
     }
 
-    // Initialize data files if missing
-    await initDataFiles();
-
-    // 1. Basic Setup
+    // 1. Setup & Config
     const startTime = Date.now();
-    // Vercel/Proxy IP Handling
-    const xff = req.headers['x-forwarded-for'];
-    const ip = xff ? xff.split(',')[0].trim() : (req.connection.remoteAddress || req.ip);
-
-    // Load Config
-    let config = DEFAULT_CONFIG;
+    let config = { ...DEFAULT_CONFIG };
     try {
         if (MONGODB_URI && mongoose.connection.readyState === 1) {
             const dbConfig = await Config.findOne({ id: 'global' }).lean();
-            if (dbConfig) config = dbConfig;
+            if (dbConfig) config = { ...DEFAULT_CONFIG, ...dbConfig };
         } else if (fs.existsSync(CONFIG_FILE)) {
-            config = JSON.parse(fs.readFileSync(CONFIG_FILE));
+            const fileConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+            config = { ...DEFAULT_CONFIG, ...fileConfig };
         }
-    } catch (e) { }
+    } catch (e) {
+        console.error("Config Loading Error:", e.message);
+    }
 
-    currentConfigGlobal = config; // Update global cache for limiter
+    currentConfigGlobal = config;
 
-    // If testing locally (::1), map to a random public IP for testing geo features, else keep it
-    const cleanIp = (ip === '::1' || ip === '127.0.0.1') ? '103.244.175.10' : ip.replace('::ffff:', ''); // 103... is a Pakistan IP example for testing
+    // Initialize Components
+    const aiEngine = new AIEngine(config.modelVersion || 'v2.0');
+    const inspector = new MultiLayerInspector(config);
 
+    // 2. Layer 3/4 Inspection (Network & Transport)
+    const netCheck = inspector.inspectNetwork(req);
+    const cleanIp = netCheck.ip;
 
-    // Country Detection: Vercel Header -> GeoIP -> Default
+    if (netCheck.blocked) {
+        await logRequest({ ip: cleanIp, country: 'Unknown', method: req.method, url: req.url, type: netCheck.reason, risk: 1.0, status: 'Blocked', layer: netCheck.layer });
+        return res.status(403).send(getBlockPage(cleanIp, netCheck.reason, 'OSI-L3-BLOCK'));
+    }
+
+    // Country Detection
     let country = req.headers['x-vercel-ip-country'];
     if (!country) {
         const geo = geoip.lookup(cleanIp);
-        country = geo ? geo.country : 'US'; // Default to US if unknown
+        country = geo ? geo.country : 'US';
     }
 
-    // Capture Payload for logging
     const currentPayload = req.method + " " + req.url + (Object.keys(req.body || {}).length ? " " + JSON.stringify(req.body) : "");
 
-    // 2. Lockdown Mode Check (ZoneAlarm Style "Internet Lock")
-    if (config.protectionMode === 'lockdown' && !req.url.startsWith('/api/') && !req.url.startsWith('/dashboard')) {
-        await logRequest({ ip: cleanIp, country, method: req.method, url: req.url, type: 'Manual Lockdown', risk: 1.0, status: 'Blocked', payload: currentPayload, isBot: false });
-        return res.status(403).send("<h1>🛡️ SYSTEM LOCKDOWN ACTIVE</h1><p>All traffic is currently suspended by the administrator.</p>");
+    // 3. Static Threat Database Check (Commercial Intelligence)
+    if (threatIntelligence.isThreat(cleanIp)) {
+        await logRequest({ ip: cleanIp, country, method: req.method, url: req.url, type: 'Static Intelligence Match', risk: 1.0, status: 'Blocked', layer: 'Layer 3 (Global Feed)' });
+        return res.status(403).send(getBlockPage(cleanIp, 'Detected in Global Threat Database', 'INTEL-BLOCK'));
     }
 
-    // 3. Internal Route Check
-    if (req.url.startsWith('/api/') || req.url.startsWith('/dashboard') || req.url === '/health') {
-        return next();
+    // 4. Lockdown Mode Check
+    if (config.protectionMode === 'lockdown') {
+        await logRequest({ ip: cleanIp, country, method: req.method, url: req.url, type: 'Manual Lockdown', risk: 1.0, status: 'Blocked', payload: currentPayload, isBot: false });
+        return res.status(403).send("<h1>🛡️ SYSTEM LOCKDOWN ACTIVE</h1><p>All traffic is currently suspended by the administrator.</p>");
     }
 
     let status = "Allowed";
     let type = "Normal";
     let risk = 0.0;
+    let detectedLayer = "Layer 7";
+    let isBotDetected = false;
 
     try {
-        // 0. Trusted Zone (Whitelist) - ZoneAlarm "Trusted" Concept
-        const whitelist = config.whitelist || [];
-        if (whitelist.includes(cleanIp)) {
-            status = "Trusted";
-            type = "Whitelisted IP";
-            risk = 0.0;
-            // Bypass all other checks
-        }
+        // 5. Blacklist Check
+        let blacklist = [];
+        try {
+            if (fs.existsSync(BLACKLIST_FILE)) {
+                blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE, 'utf8') || '[]');
+            }
+        } catch (e) { }
 
-        // 3. Honeypot Check
-        const honeyPaths = ['/.env', '/admin_setup', '/wp-admin', '/phpmyadmin', '/backup.zip'];
-        if (status === "Allowed" && honeyPaths.some(p => req.url.includes(p))) {
+        if (blacklist.some(b => b.ip === cleanIp)) {
             status = "Blocked";
-            type = "WAF Honeypot Trap";
+            type = "Local Blacklist";
             risk = 1.0;
-            updateReputation(cleanIp, -50); // Massive penalty
-
-            const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
-            if (!blacklist.find(b => b.ip === cleanIp)) {
-                blacklist.push({ ip: cleanIp, reason: `WAF Honeypot: ${req.url}`, timestamp: Date.now() });
-                fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(blacklist, null, 2));
-            }
-            sendSOCAlert({ type, ip: cleanIp, country, risk, payload: req.url });
+            detectedLayer = "Layer 3";
         }
 
-        // 4. Global Blacklist Check
-        if (status === "Allowed") {
-            const blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE));
-            if (blacklist.some(b => b.ip === cleanIp)) {
-                status = "Blocked";
-                type = "Blacklisted IP";
-                risk = 1.0;
-            }
-        }
-
-        // 5. Geo-Blocking
+        // 6. Geo-Blocking
         if (status === "Allowed" && config.blockedCountries.includes(country)) {
             status = "Blocked";
             type = `Geo-Blocked (${country})`;
             risk = 1.0;
+            detectedLayer = "Layer 3";
         }
 
-        // 6. ML & Signature Inspection
+        // 7. Layer 7 (Application) - AI & Signature Inspection
         if (status === "Allowed") {
-            // Default modules if missing (backward compatibility)
-            const modules = config.modules || { sqli: true, xss: true, pathTraversal: true, rce: true, bot: true };
-
-            const features = extractFeatures(req);
-            let botRisk = 0;
-
-            if (modules.bot) {
-                botRisk = getFingerprintRisk(req);
-            }
-
-            risk = 0.5 + botRisk;
-            type = (modules.bot && botRisk > 0.4) ? "Automated Bot/Script" : "Normal";
-
-            // Heuristic Discovery (ZoneAlarm Style Heuristic)
-            risk = (features[1] * 2 + (features[2] + features[3]) * 0.5 + features[5] * 0.1 + botRisk) / 3;
-
-            const payload = req.url + (req.body && Object.keys(req.body).length ? JSON.stringify(req.body) : "");
-            const decodedPayload = decodeURIComponent(payload);
-
-            const moduleMap = {
-                'SQL Injection': modules.sqli,
-                'XSS': modules.xss,
-                'Path Traversal': modules.pathTraversal,
-                'WebShell/RCE': modules.rce
-            };
-
-            const detectedType = Object.keys(SIGNATURES).find(cat => {
-                // Skip if module is disabled
-                if (moduleMap[cat] === false) return false;
-                return SIGNATURES[cat].some(p => p.test(decodedPayload));
-            });
-
-            if (detectedType) {
-                type = detectedType;
-                risk = 1.0;
-            }
-
-            if ((risk > config.riskThreshold || detectedType) && (config.protectionMode === 'blocking' || config.protectionMode === 'stealth')) {
+            const appCheck = inspector.inspectApplication(req, aiEngine);
+            if (appCheck.blocked) {
                 status = "Blocked";
-                if (!detectedType) type = "ML Anomaly Detection"; // Differentiate ML blocks from signatures
-                console.log(`🚨 BLOCKING: ${type} from ${cleanIp} (Risk: ${risk.toFixed(3)})`);
-                sendSOCAlert({ type, ip: cleanIp, country, risk, payload: payload.substring(0, 100) });
+                type = appCheck.reason;
+                risk = appCheck.score || 1.0;
+                detectedLayer = appCheck.layer;
+                isBotDetected = !!appCheck.isBot;
             }
         }
 
-
-
-        // 7. Log results (await to ensure persistence in serverless)
+        // Final Logging
         await logRequest({
             ip: cleanIp, country, url: req.url, method: req.method,
             userAgent: req.headers['user-agent'] || 'Unknown',
             risk: parseFloat(risk.toFixed(3)), status, type,
+            layer: detectedLayer,
+            isBot: isBotDetected,
             responseTime: Date.now() - startTime,
-            isBot: req.isBot || false,
-            payload: currentPayload // Use the captured payload
+            payload: currentPayload
         });
 
         if (status === "Blocked") {
             const incidentId = Math.random().toString(36).substring(7).toUpperCase();
-            console.log(`🚨 BLOCKING: ${type} from ${cleanIp} (Incident: ${incidentId})`);
-
             if (config.protectionMode === 'stealth') {
-                console.log("👻 STEALTH MODE: Killing TCP socket for hostiles.");
                 if (res.socket) res.socket.destroy();
                 else res.destroy();
                 return;
             }
-
             return res.status(403).send(getBlockPage(cleanIp, type, incidentId));
         }
 
@@ -429,6 +325,7 @@ app.use(async (req, res, next) => {
         next();
     }
 });
+
 
 // Primary Reverse Proxy with Dynamic Target
 app.use('/', limiter, (req, res, next) => {
@@ -548,9 +445,10 @@ app.get('/api/stats', async (req, res) => {
             logs = await Log.find().sort({ timestamp: -1 }).limit(50).lean();
         } else {
             await initDataFiles();
-            logs = JSON.parse(fs.readFileSync(LOG_FILE, 'utf8'));
-            blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE, 'utf8'));
-            config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+            const logContent = fs.readFileSync(LOG_FILE, 'utf8');
+            logs = logContent.split('\n').filter(l => l.trim()).map(l => JSON.parse(l));
+            blacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE, 'utf8') || '[]');
+            config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8') || '[]');
             total = logs.length;
             blocked = logs.filter(l => l.status === "Blocked").length;
             logs.forEach(l => {
@@ -580,7 +478,8 @@ app.get('/api/logs', async (req, res) => {
             return res.json(logs);
         }
         await initDataFiles();
-        const logs = JSON.parse(fs.readFileSync(LOG_FILE, 'utf8'));
+        const logContent = fs.readFileSync(LOG_FILE, 'utf8');
+        const logs = logContent.split('\n').filter(l => l.trim()).map(l => JSON.parse(l));
         res.json([...logs].reverse().slice(0, 50));
     } catch (err) {
         res.json([]);

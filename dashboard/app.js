@@ -160,6 +160,7 @@ function updateUI(logs, stats, syncInputs) {
 
         s('cfg-target', currentConfig.targetUrl);
         s('cfg-mode', currentConfig.protectionMode);
+        s('cfg-rate-limit', currentConfig.rateLimit || 100);
         s('cfg-threshold', Math.round((currentConfig.riskThreshold || 0.88) * 100));
 
         const m = currentConfig.modules || {};
@@ -203,14 +204,19 @@ function updateThreatIntel(stats) {
 
     const map = {
         'sqli': 'SQL Injection',
-        'xss': 'XSS Attacks',
+        'xss': 'XSS',
         'path': 'Path Traversal',
         'rce': 'WebShell/RCE',
-        'anomaly': 'ML Anomaly Detection'
+        'anomaly': 'ML Anomaly Detection',
+        'bot': 'Automated Bot/Script',
+        'honey': 'WAF Honeypot Trap',
+        'infra': 'Blacklisted IP'
     };
 
     Object.entries(map).forEach(([id, name]) => {
-        const count = t[name] || 0;
+        let count = t[name] || 0;
+        if (id === 'anomaly' && t['Anomaly Detected']) count += t['Anomaly Detected'];
+
         const el = document.getElementById(`${id}-count`);
         const bar = document.getElementById(`${id}-bar`);
         if (el) el.innerText = count;
@@ -291,7 +297,7 @@ function updateCharts(logs, stats) {
 
     // Update Vector Profile
     const t = stats.threats || {};
-    vectorChart.data.datasets[0].data = [t['SQL Injection'] || 0, t['XSS Attacks'] || 0, t['WebShell/RCE'] || 0, t['ML Anomaly Detection'] || 0];
+    vectorChart.data.datasets[0].data = [t['SQL Injection'] || 0, t['XSS'] || 0, t['WebShell/RCE'] || 0, t['ML Anomaly Detection'] || 0];
     vectorChart.update('none');
 }
 

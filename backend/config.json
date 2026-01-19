@@ -1,14 +1,10 @@
 {
-  "targetUrl": "http://localhost:5000",
-  "rateLimit": 100,
-  "riskThreshold": 0.88,
-  "blockedCountries": [],
-  "protectionMode": "stealth",
-  "modules": {
-    "sqli": true,
-    "xss": true,
-    "pathTraversal": true,
-    "rce": true,
-    "bot": true
-  }
+    "modelVersion": "ms-defender",
+    "riskThreshold": 0.85,
+    "protectionMode": "blocking",
+    "blockedCountries": [
+        "CN",
+        "RU",
+        "KP"
+    ]
 }

@@ -1,0 +1,7 @@
+{
+  "specDensityWeight": 15.119484563235845,
+  "entropyWeight": -0.17469629921418023,
+  "version": "3.2.0-PRO-MS",
+  "trainedOn": "microsoft-waf-crs",
+  "timestamp": "2026-01-19T16:02:33.318Z"
+}

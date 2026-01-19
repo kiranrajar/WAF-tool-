@@ -27,7 +27,8 @@ The underlying engine was upgraded from a simple rule-matcher to a production-re
 ### 5. Future Roadmap
 *   **Distributed Architecture**: Moving from local persistence to a globally distributed database for multi-node WAF deployments.
 *   **Edge Deployment**: Adapting the Node.js engine for Cloudflare Workers or Vercel Edge implementation.
-*   **Advanced Threat Hunting**: AI-driven predictive modeling for future botnet behavior patterns.
+*   **Adaptive Intelligence**: Successfully trained the AI engine on Windows Defender and Microsoft WAF Managed Rulesets (CRS) for industry-aligned detection.
+*   **Predictive Threat Hunting**: AI-driven predictive modeling for future botnet behavior patterns using the new trained weights.
 
 ---
 **Status**: DEPLOYED (v3.0.0)

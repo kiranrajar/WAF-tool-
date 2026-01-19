@@ -1,0 +1,13 @@
+{
+    "version": "1.0.0",
+    "weights": {
+        "specDensityWeight": 2.5,
+        "entropyWeight": 0.8,
+        "signatureMultiplier": 0.5,
+        "botWeight": 1.2
+    },
+    "metadata": {
+        "training_date": "2026-01-19",
+        "accuracy": 0.94
+    }
+}
