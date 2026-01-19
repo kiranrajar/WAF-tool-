@@ -19,6 +19,8 @@ const { Log, Blacklist, Reputation, Config } = require('./models');
 const AIEngine = require('./core/ai-engine');
 const MultiLayerInspector = require('./core/osi-layer');
 const threatIntelligence = require('./intelligence/threat-feeds');
+const botMitigation = require('./core/bot-mitigation');
+const schemaValidator = require('./core/schema-validator');
 
 
 const app = express();
@@ -138,6 +140,19 @@ const limiter = rateLimit({
 });
 
 let currentConfigGlobal = DEFAULT_CONFIG; // Cache for the limiter
+
+// --- COMMERCIAL FEATURE: Bot Verification Route ---
+app.post('/api/verify-human', bodyParser.urlencoded({ extended: true }), (req, res) => {
+    const { token, ts, redirect, fp } = req.body;
+    const ip = req.ip.replace('::ffff:', '');
+
+    if (botMitigation.verifyToken(token, ts)) {
+        botMitigation.recordVerification(ip);
+        console.log(`🤖 [BOT MITIGATION] Humanity verified for IP: ${ip} | FP: ${fp}`);
+        return res.redirect(redirect || '/');
+    }
+    res.status(403).send("<h1>Verification Failed</h1><p>Cryptographic proof invalid.</p>");
+});
 
 
 // Serve static files (Dashboard)
@@ -293,17 +308,38 @@ app.use(async (req, res, next) => {
 
         // 7. Layer 7 (Application) - AI & Signature Inspection
         if (status === "Allowed") {
-            const appCheck = inspector.inspectApplication(req, aiEngine);
-            if (appCheck.blocked) {
+            // A. Schema Validation
+            const schemaCheck = schemaValidator.validate(req);
+            if (!schemaCheck.valid) {
                 status = "Blocked";
-                type = appCheck.reason;
-                risk = appCheck.score || 1.0;
-                detectedLayer = appCheck.layer;
-                isBotDetected = !!appCheck.isBot;
+                type = "API Schema Violation";
+                risk = 0.9;
+                detectedLayer = "Layer 7 (API)";
+                console.warn(`🛡️ [SCHEMA GUARD] ${schemaCheck.reason} for ${req.path}`);
+            }
+
+            // B. Core App Check
+            if (status === "Allowed") {
+                const appCheck = inspector.inspectApplication(req, aiEngine);
+
+                // C. Active Bot Challenge logic (Commercial Mitigation)
+                const isVerifiedHuman = botMitigation.isVerified(cleanIp);
+                if (appCheck.risk > 0.4 && !isVerifiedHuman && !isStatic) {
+                    console.log(`🌀 [BOT CHALLENGE] Redirecting suspicious IP: ${cleanIp}`);
+                    return res.send(botMitigation.generateChallengePage(req.url));
+                }
+
+                if (appCheck.blocked) {
+                    status = "Blocked";
+                    type = appCheck.reason;
+                    risk = appCheck.risk;
+                    isBotDetected = !!appCheck.isBot;
+                    detectedLayer = appCheck.layer || "Layer 7";
+                }
             }
         }
 
-        // Final Logging
+        // 8. Final Logging
         await logRequest({
             ip: cleanIp, country, url: req.url, method: req.method,
             userAgent: req.headers['user-agent'] || 'Unknown',

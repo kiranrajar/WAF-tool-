@@ -1,6 +1,6 @@
 /**
- * AEGIS Shield: Threat Intelligence Service
- * Synchronizes with global static threat databases and IP blacklists.
+ * SYNAPSE: Neural Threat Intelligence Service
+ * Synchronizes with global real-time threat databases and malicious IP pools.
  */
 
 const axios = require('axios');

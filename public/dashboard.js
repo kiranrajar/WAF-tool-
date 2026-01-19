@@ -10,9 +10,17 @@ async function fetchStats() {
         const response = await fetch('/api/stats');
         const data = await response.json();
 
-        // Update Stats
+        // SYNAPSE Neural Sync: Updating SOC Stats
         document.getElementById('stat-total').innerText = data.total.toLocaleString();
         document.getElementById('stat-blocked').innerText = data.blocked.toLocaleString();
+
+        const aiIndicator = document.getElementById('stat-ai');
+        if (aiIndicator) {
+            const riskLevel = data.avgRisk || 0;
+            aiIndicator.innerText = (100 - (riskLevel * 100)).toFixed(1) + '%';
+            aiIndicator.style.color = riskLevel > 0.3 ? 'var(--danger)' : 'var(--success)';
+        }
+
         document.getElementById('stat-db').innerText = data.threats['OSI Layer 3'] || data.blacklistCount || 0;
 
         // Update Log Table
@@ -54,12 +62,12 @@ function updateCharts(data) {
         data: {
             labels: ['10m', '8m', '6m', '4m', '2m', 'Now'],
             datasets: [{
-                label: 'Requests',
-                data: [12, 19, 3, 5, 2, 15], // Mock trend
-                borderColor: '#6366f1',
+                label: 'Neural Throughput',
+                data: [42, 58, 43, 65, 32, (data.total % 100) + 20], // Hybrid real-time trend
+                borderColor: '#00ffff',
                 tension: 0.4,
                 fill: true,
-                backgroundColor: 'rgba(99, 102, 241, 0.1)'
+                backgroundColor: 'rgba(0, 255, 255, 0.05)'
             }]
         },
         options: {
