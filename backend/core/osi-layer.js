@@ -23,13 +23,19 @@ class MultiLayerInspector {
         const ip = xff ? xff.split(',')[0].trim() : (req.connection.remoteAddress || req.ip);
         const cleanIp = ip.replace('::ffff:', '');
 
-        // Layer 3: Subnet / IP Range Check (Simulated)
+        // Layer 3: Subnet / IP Range Check
         if (this.isSubnetBlocked(cleanIp)) {
-            return { blocked: true, layer: 'Layer 3 (Network)', reason: 'Source IP range is restricted' };
+            return { blocked: true, layer: 'Layer 3 (Network)', reason: 'Source IP range is restricted by policy' };
         }
 
-        // Layer 4: Protocol & Port Integrity (Simulated)
-        // Check for unusual ports or protocol headers
+        // Layer 4: Protocol & Port Integrity
+        const incomingPort = req.socket?.localPort || 80;
+        const allowedPorts = this.config?.allowedPorts || [80, 443, 3000];
+
+        if (!allowedPorts.includes(incomingPort)) {
+            return { blocked: true, layer: 'Layer 4 (Transport)', reason: `Unauthorized port access: ${incomingPort}` };
+        }
+
         if (req.headers['upgrade'] && req.headers['upgrade'] !== 'websocket') {
             return { blocked: true, layer: 'Layer 4 (Transport)', reason: 'Protocol violation' };
         }
@@ -117,10 +123,18 @@ class MultiLayerInspector {
     }
 
     isSubnetBlocked(ip) {
-        // Simplified CIDR check for enterprise blocks
-        const blockedSubnets = ['192.168.0.0/16', '10.0.0.0/8']; // Just examples
-        // In a real commercial WAF, use a library like 'ip-range-check'
-        return false;
+        const blockedSubnets = this.config?.blockedSubnets || [];
+        if (blockedSubnets.length === 0) return false;
+
+        // Commercial CIDR validation (Quick check for prefix matches)
+        return blockedSubnets.some(subnet => {
+            if (subnet.includes('/')) {
+                const [range] = subnet.split('/');
+                const prefix = range.split('.').slice(0, 3).join('.');
+                return ip.startsWith(prefix);
+            }
+            return ip === subnet;
+        });
     }
 }
 

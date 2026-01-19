@@ -72,6 +72,8 @@ const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
 // Initialize files if not exists (or copy to /tmp in Vercel)
 const DEFAULT_CONFIG = {
     blockedCountries: ['CN', 'RU', 'KP'],
+    allowedPorts: [80, 443, 3000],
+    blockedSubnets: [],
     rateLimit: 100,
     riskThreshold: 0.88,
     protectionMode: 'blocking',

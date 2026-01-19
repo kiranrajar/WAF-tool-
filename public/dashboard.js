@@ -97,6 +97,10 @@ async function fetchCurrentConfig() {
         if (document.getElementById('protection-mode')) document.getElementById('protection-mode').value = config.protectionMode;
         if (document.getElementById('target-url')) document.getElementById('target-url').value = config.targetUrl;
         if (document.getElementById('blocked-countries')) document.getElementById('blocked-countries').value = config.blockedCountries.join(', ');
+
+        // Network Layer Settings
+        if (document.getElementById('allowed-ports')) document.getElementById('allowed-ports').value = (config.allowedPorts || []).join(', ');
+        if (document.getElementById('blocked-subnets')) document.getElementById('blocked-subnets').value = (config.blockedSubnets || []).join(', ');
     } catch (e) {
         console.error("Config fetch error:", e);
     }
@@ -108,7 +112,9 @@ async function saveEngineConfig() {
         riskThreshold: parseFloat(document.getElementById('risk-range')?.value),
         protectionMode: document.getElementById('protection-mode')?.value,
         targetUrl: document.getElementById('target-url')?.value,
-        blockedCountries: document.getElementById('blocked-countries')?.value.split(',').map(s => s.trim()).filter(s => s)
+        blockedCountries: document.getElementById('blocked-countries')?.value.split(',').map(s => s.trim()).filter(s => s),
+        allowedPorts: document.getElementById('allowed-ports')?.value.split(',').map(s => parseInt(s.trim())).filter(s => !isNaN(s)),
+        blockedSubnets: document.getElementById('blocked-subnets')?.value.split(',').map(s => s.trim()).filter(s => s)
     };
 
     try {

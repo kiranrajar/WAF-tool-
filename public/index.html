@@ -249,6 +249,23 @@
                         <button onclick="saveEngineConfig()">Synchronize Global Policy</button>
                     </div>
                 </div>
+
+                <div class="section">
+                    <div class="section-header">
+                        <h2>Network Security (L3/L4)</h2>
+                    </div>
+                    <div style="padding:24px;">
+                        <div class="input-group">
+                            <label>Allowed Inbound Ports (Comma Separated)</label>
+                            <input type="text" id="allowed-ports" placeholder="80, 443, 3000">
+                        </div>
+                        <div class="input-group">
+                            <label>Blocked IP Subnets/Ranges (CIDR)</label>
+                            <input type="text" id="blocked-subnets" placeholder="192.168.1.0/24, 10.0.0.0/8">
+                        </div>
+                        <button onclick="saveEngineConfig()">Apply Network Rules</button>
+                    </div>
+                </div>
                 <div class="section">
                     <div class="section-header">
                         <h2>Infrastructure Status</h2>
