@@ -2,11 +2,11 @@
     "rewrites": [
         {
             "source": "/dashboard",
-            "destination": "/dashboard/index.html"
+            "destination": "/index.html"
         },
         {
             "source": "/dashboard/(.*)",
-            "destination": "/dashboard/$1"
+            "destination": "/$1"
         },
         {
             "source": "/api/stats",

@@ -141,7 +141,8 @@ let currentConfigGlobal = DEFAULT_CONFIG; // Cache for the limiter
 
 
 // Serve static files (Dashboard)
-app.use('/dashboard', express.static(path.join(__dirname, '../dashboard')));
+app.use('/dashboard', express.static(path.join(__dirname, '../public')));
+app.use(express.static(path.join(__dirname, '../public')));
 
 // Custom Block Page Helper
 function getBlockPage(ip, reason, incidentId) {
