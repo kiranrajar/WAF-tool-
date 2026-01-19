@@ -21,6 +21,9 @@ const MultiLayerInspector = require('./core/osi-layer');
 const threatIntelligence = require('./intelligence/threat-feeds');
 const botMitigation = require('./core/bot-mitigation');
 const schemaValidator = require('./core/schema-validator');
+const honeytokens = require('./core/honeytokens');
+const virtualPatching = require('./core/virtual-patching');
+const identityGuard = require('./core/identity-guard');
 
 
 const app = express();
@@ -308,7 +311,42 @@ app.use(async (req, res, next) => {
             detectedLayer = "Layer 3";
         }
 
-        // 7. Layer 7 (Application) - AI & Signature Inspection
+        // 7. Honeytoken Trap (Deception Layer)
+        if (status === "Allowed" && honeytokens.isTrap(req.path)) {
+            status = "Blocked";
+            type = "Honeytoken Trap Tripped";
+            risk = 1.0;
+            detectedLayer = "Layer 7 (Deception)";
+
+            // Auto-blacklist for high fidelity bot signal
+            if (MONGODB_URI) {
+                await Blacklist.updateOne({ ip: cleanIp }, { $set: { reason: "Honeytoken Trap Trip" } }, { upsert: true });
+            }
+        }
+
+        // 8. Identity Guard (Auth/JWT Inspection)
+        if (status === "Allowed") {
+            const idCheck = identityGuard.inspect(req);
+            if (!idCheck.valid) {
+                status = "Blocked";
+                type = idCheck.reason;
+                risk = idCheck.risk || 1.0;
+                detectedLayer = "Layer 7 (Identity)";
+            }
+        }
+
+        // 9. Virtual Patching (CVE Defense)
+        if (status === "Allowed") {
+            const vPatch = virtualPatching.inspect(req);
+            if (vPatch.blocked) {
+                status = "Blocked";
+                type = vPatch.reason;
+                risk = 1.0;
+                detectedLayer = vPatch.layer;
+            }
+        }
+
+        // 10. Layer 7 (Application) - AI & Signature Inspection
         if (status === "Allowed") {
             // A. Schema Validation
             const schemaCheck = schemaValidator.validate(req);
@@ -396,36 +434,37 @@ app.use('/', limiter, (req, res, next) => {
     }
 
     createProxyMiddleware({
-        target: dynamicTarget || TARGET_URL, // Fallback purely for startup safety
+        target: dynamicTarget || TARGET_URL,
         changeOrigin: true,
-        secure: false, // For local self-signed certs
-        ws: true, // Support WebSockets
-        xfwd: true, // Forward headers
+        secure: false,
+        ws: true,
+        xfwd: true,
         onProxyRes: (proxyRes, req, res) => {
-            // Inject Honeypot Link into HTML responses
+            // High-Performance Response Injection (Deception Layer)
             if (proxyRes.headers['content-type']?.includes('text/html')) {
                 const originalWrite = res.write;
                 const originalEnd = res.end;
-                let body = '';
+                let body = Buffer.from([]);
 
-                res.write = function (chunk) { body += chunk; };
-                res.end = function (chunk) {
-                    if (chunk) body += chunk;
-                    // Inject a hidden honeypot link before </body>
-                    const honeyLink = '<a href="/admin_setup" style="display:none;" aria-hidden="true">Admin Panel</a>';
-                    body = body.replace('</body>', `${honeyLink}</body>`);
+                res.write = (chunk) => { body = Buffer.concat([body, chunk]); };
+                res.end = (chunk) => {
+                    if (chunk) body = Buffer.concat([body, chunk]);
+                    let finalBody = body.toString('utf8');
 
-                    res.setHeader('content-length', Buffer.byteLength(body));
-                    originalWrite.call(res, body);
+                    // Inject hidden honeytokens for bot/scraper detection
+                    finalBody = honeytokens.injectHoney(finalBody);
+
+                    res.setHeader('Content-Length', Buffer.byteLength(finalBody));
+                    res.setHeader('Content-Type', 'text/html');
+                    originalWrite.call(res, finalBody);
                     originalEnd.call(res);
                 };
             }
         },
         onProxyReq: (proxyReq, req, res) => {
-            // Disable compression so we can inject content safely
+            // Disable compression for manipulation
             proxyReq.removeHeader('accept-encoding');
-
-            proxyReq.setHeader('X-Protected-By', 'AEGIS-Shield-v3');
+            proxyReq.setHeader('X-Protected-By', 'SYNAPSE-NEURAL-DEFENSE-v3.2');
             proxyReq.setHeader('X-Real-IP', req.ip);
             // Ensure host header matches target for external sites
             if (dynamicTarget.includes('http')) {
