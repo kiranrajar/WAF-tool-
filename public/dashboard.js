@@ -174,7 +174,7 @@ function updateCharts(data) {
             labels: threatLabels,
             datasets: [{
                 data: threatData,
-                backgroundColor: ['#00ffff', '#ff0055', '#ffaa00', '#00ffaa', '#ff00ff'],
+                backgroundColor: ['#00ffff', '#ff0055', '#ffaa00', '#00ffaa', '#ff00ff', '#5500ff', '#0055ff', '#ffff00'],
                 borderWidth: 0
             }]
         },

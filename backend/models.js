@@ -11,6 +11,7 @@ const logSchema = new mongoose.Schema({
     risk: Number,
     status: String,
     type: String,
+    layer: String,
     responseTime: Number,
     isBot: Boolean,
     payload: String

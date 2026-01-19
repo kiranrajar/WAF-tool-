@@ -503,12 +503,19 @@ app.get('/api/stats', async (req, res) => {
             total = await Log.countDocuments();
             blocked = await Log.countDocuments({ status: "Blocked" });
 
-            // Get threat breakdown
+            // Get threat breakdown (Dynamic based on detected types)
             const threatStats = await Log.aggregate([
                 { $match: { type: { $ne: "Normal" } } },
                 { $group: { _id: "$type", count: { $sum: 1 } } }
             ]);
             threatStats.forEach(t => { threats[t._id] = t.count; });
+
+            // Get Layer breakdown for SOC visibility
+            const layerStats = await Log.aggregate([
+                { $group: { _id: "$layer", count: { $sum: 1 } } }
+            ]);
+            let layers = {};
+            layerStats.forEach(l => { layers[l._id || 'L7'] = l.count; });
 
             // Geo stats aggregation
             const gStats = await Log.aggregate([
@@ -525,6 +532,16 @@ app.get('/api/stats', async (req, res) => {
             config = dbConfig || DEFAULT_CONFIG;
 
             logs = await Log.find().sort({ timestamp: -1 }).limit(50).lean();
+
+            res.json({
+                total, blocked, allowed: total - blocked,
+                avgRisk: logs.length > 0 ? logs.reduce((acc, l) => acc + l.risk, 0) / logs.length : 0,
+                threats, geoStats, layers,
+                blacklistCount: blacklist.length,
+                config,
+                recentLogs: logs.map(l => ({ ...l, id: l._id }))
+            });
+            return;
         } else {
             await initDataFiles();
             const logContent = fs.readFileSync(LOG_FILE, 'utf8');
@@ -533,20 +550,23 @@ app.get('/api/stats', async (req, res) => {
             config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8') || '[]');
             total = logs.length;
             blocked = logs.filter(l => l.status === "Blocked").length;
+            let layers = {};
             logs.forEach(l => {
                 if (l.type !== "Normal") threats[l.type] = (threats[l.type] || 0) + 1;
                 if (l.status === "Blocked") geoStats[l.country] = (geoStats[l.country] || 0) + 1;
+                layers[l.layer || 'L7'] = (layers[l.layer || 'L7'] || 0) + 1;
             });
-        }
 
-        res.json({
-            total, blocked, allowed: total - blocked,
-            avgRisk: logs.length > 0 ? logs.reduce((acc, l) => acc + l.risk, 0) / logs.length : 0,
-            threats, geoStats,
-            blacklistCount: blacklist.length,
-            config,
-            recentLogs: logs.map(l => ({ ...l, id: l._id })) // Ensure ID for mapping
-        });
+            res.json({
+                total, blocked, allowed: total - blocked,
+                avgRisk: logs.length > 0 ? logs.reduce((acc, l) => acc + l.risk, 0) / logs.length : 0,
+                threats, geoStats, layers,
+                blacklistCount: blacklist.length,
+                config,
+                recentLogs: logs.map(l => ({ ...l, id: l._id }))
+            });
+            return;
+        }
     } catch (err) {
         console.error("Stats API Error:", err);
         res.status(500).json({ error: "Failed to read data" });
