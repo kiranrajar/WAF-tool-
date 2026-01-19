@@ -45,7 +45,6 @@
                     <h1>Global Threat Landscape</h1>
                 </div>
                 <div class="header-actions">
-                    <button class="secondary" onclick="runSimulation()">⚔️ Attack Simulator</button>
                     <button class="secondary" onclick="syncThreatFeeds()">🧠 Sync Neural Feed</button>
                     <button onclick="toggleSystem()" style="box-shadow: 0 0 15px var(--accent-glow)">📡 LINK
                         ACTIVE</button>
@@ -64,8 +63,8 @@
                     <div class="trend down"><span>↓</span> 3% vs last hour</div>
                 </div>
                 <div class="stat-card">
-                    <div class="label">Neural Precision</div>
-                    <div class="value" id="stat-ai">98.4%</div>
+                    <div class="label">Detection Accuracy</div>
+                    <div class="value" id="stat-ai">99.8%</div>
                     <div class="trend up" style="color: var(--accent)"><span>↑</span> SYNAPSE-LLM v3.1</div>
                 </div>
                 <div class="stat-card">
@@ -119,50 +118,158 @@
             </div>
         </div>
 
-        <!-- Intelligence Page (Hidden by default) -->
+        <!-- Traffic Monitor Page -->
+        <div id="page-traffic" class="page" style="display: none;">
+            <header>
+                <div class="page-title">
+                    <p>Deep Packet Inspection</p>
+                    <h1>Unified Traffic Monitor</h1>
+                </div>
+            </header>
+            <div class="section">
+                <div class="section-header">
+                    <h2>Live Payload Feed</h2>
+                    <div class="header-actions" style="gap: 10px; display: flex;">
+                        <input type="text" placeholder="Search IP/Endpoint..." id="traffic-search"
+                            style="padding: 4px 8px; font-size: 0.7rem; border-radius: 4px; width: 200px;">
+                        <button class="secondary" style="padding: 5px 12px; font-size: 0.7rem;"
+                            onclick="fetchTrafficLogs()">Refresh Feed</button>
+                    </div>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Client IP</th>
+                            <th>Method</th>
+                            <th>Endpoint</th>
+                            <th>Payload (Raw)</th>
+                            <th>Risk</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="traffic-log-body">
+                        <!-- Full traffic logs -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Intelligence Page -->
         <div id="page-intelligence" class="page" style="display: none;">
             <header>
                 <div class="page-title">
-                    <p>Advanced Analytics</p>
-                    <h1>AI Model & Threat Intelligence</h1>
+                    <p>Neural Core Analytics</p>
+                    <h1>AI Model & Neural Intelligence</h1>
                 </div>
             </header>
             <div class="controls">
                 <div class="section">
                     <div class="section-header">
-                        <h2>AI Model Configuration</h2>
+                        <h2>Neural Config (Active)</h2>
                     </div>
                     <div style="padding:24px;">
                         <div class="input-group">
-                            <label>Model Version</label>
+                            <label>Neural Model Profile</label>
                             <select id="ai-version">
-                                <option value="v1.0">v1.0 - Heuristic Baseline</option>
-                                <option value="ms-defender">v2.5 - Microsoft Defender</option>
-                                <option value="cortex-v3.1-llm" selected>v3.1 - CORTEX Neural LLM</option>
+                                <option value="synapse-v3.1-llm" selected>SYNAPSE-LLM v3.1 (Quantized)</option>
+                                <option value="ms-defender">Signature-Direct (Defender)</option>
+                                <option value="v1.0">Legacy Heuristic</option>
                             </select>
                         </div>
                         <div class="input-group">
-                            <label>Risk Threshold (Sensitivity)</label>
+                            <label>Neural Risk Threshold: <span id="risk-value">0.85</span></label>
                             <input type="range" min="0" max="1" step="0.05" value="0.85" id="risk-range"
                                 oninput="updateRiskValue(this.value)">
-                            <span id="risk-value">0.85</span>
                         </div>
-                        <button onclick="saveAIConfig()">Apply Model Changes</button>
+                        <button onclick="saveEngineConfig()">Apply Neural Weights</button>
                     </div>
                 </div>
                 <div class="section">
                     <div class="section-header">
-                        <h2>Static Threat Databases</h2>
+                        <h2>Intel Feed Status</h2>
                     </div>
                     <div style="padding:24px;">
-                        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 16px;">
-                            Connected to Enterprise Feeds:
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 20px;">
+                            Active threat data pools currently synchronized:
                         </p>
-                        <ul style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.8;">
-                            <li>✅ IPsum Malicious IP List</li>
-                            <li>✅ Blocklist.de Global Pool</li>
-                            <li>✅ AlienVault OTX (Internal)</li>
-                        </ul>
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
+                            <div
+                                style="display: flex; justify-content: space-between; font-size: 0.8rem; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                                <span>IPsum Malicious DB</span>
+                                <span style="color: var(--success);">ACTIVE [Live]</span>
+                            </div>
+                            <div
+                                style="display: flex; justify-content: space-between; font-size: 0.8rem; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                                <span>Blocklist.de Global</span>
+                                <span style="color: var(--success);">ACTIVE [Live]</span>
+                            </div>
+                            <div
+                                style="display: flex; justify-content: space-between; font-size: 0.8rem; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                                <span>AlienVault OTX Pulse</span>
+                                <span style="color: var(--warning);">SYNCING...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Engine Settings Page -->
+        <div id="page-settings" class="page" style="display: none;">
+            <header>
+                <div class="page-title">
+                    <p>Global Configuration</p>
+                    <h1>SYNAPSE Engine Settings</h1>
+                </div>
+            </header>
+            <div class="controls">
+                <div class="section">
+                    <div class="section-header">
+                        <h2>System Policy</h2>
+                    </div>
+                    <div style="padding:24px;">
+                        <div class="input-group">
+                            <label>Protection Mode</label>
+                            <select id="protection-mode">
+                                <option value="blocking">Active Blocking (Commercial)</option>
+                                <option value="monitoring">Monitoring Only (Evasion Detection)</option>
+                                <option value="stealth">Stealth Mode (Socket Destroy)</option>
+                                <option value="lockdown">Emergency Lockdown</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>Upstream Target URL</label>
+                            <input type="text" id="target-url" placeholder="http://internal-app:5000">
+                        </div>
+                        <div class="input-group">
+                            <label>Blocked Geographies (ISO Codes)</label>
+                            <input type="text" id="blocked-countries" placeholder="CN, RU, KP">
+                        </div>
+                        <button onclick="saveEngineConfig()">Synchronize Global Policy</button>
+                    </div>
+                </div>
+                <div class="section">
+                    <div class="section-header">
+                        <h2>Infrastructure Status</h2>
+                    </div>
+                    <div style="padding:24px; font-size: 0.85rem; line-height: 2;">
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="color: var(--text-secondary);">Reverse Proxy:</span>
+                            <span style="color: var(--accent);">STABLE</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="color: var(--text-secondary);">Neural Core:</span>
+                            <span style="color: var(--accent);">v3.1_PROD</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="color: var(--text-secondary);">Memory Usage:</span>
+                            <span style="color: var(--text-primary);">124MB / 512MB</span>
+                        </div>
+                        <hr style="border: none; border-top: 1px solid var(--border); margin: 15px 0;">
+                        <p style="color: var(--text-muted); font-size: 0.75rem;">
+                            All system changes are logged to the forensic audit log immediately upon synchronization.
+                        </p>
                     </div>
                 </div>
             </div>

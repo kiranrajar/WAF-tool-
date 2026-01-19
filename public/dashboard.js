@@ -23,29 +23,30 @@ async function fetchStats() {
 
         document.getElementById('stat-db').innerText = data.threats['OSI Layer 3'] || data.blacklistCount || 0;
 
-        // Update Log Table
+        // Update Overview Log Table
         const logBody = document.getElementById('log-table-body');
-        logBody.innerHTML = '';
+        if (logBody) {
+            logBody.innerHTML = '';
+            data.recentLogs.slice(0, 15).forEach(log => {
+                const row = document.createElement('tr');
+                const layerBadge = log.type === 'Normal' ? '' : `<span class="badge badge-warning" style="border: 1px solid var(--warning)">${log.layer || 'L7'}</span>`;
+                const botBadge = log.isBot ? `<span class="badge" style="background: var(--neon-pink); color: white; margin-left: 4px; box-shadow: 0 0 10px var(--neon-pink)">LLM_BOT</span>` : '';
+                const statusBadge = log.status === 'Blocked'
+                    ? `<span class="badge badge-danger" style="background: rgba(255,0,85,0.1); border: 1px solid var(--danger); border-radius: 2px;">TERMINATED</span>`
+                    : `<span class="badge badge-success" style="background: rgba(0,255,170,0.1); border: 1px solid var(--success); border-radius: 2px;">CLEAN</span>`;
 
-        data.recentLogs.slice(0, 15).forEach(log => {
-            const row = document.createElement('tr');
-            const layerBadge = log.type === 'Normal' ? '' : `<span class="badge badge-warning" style="border: 1px solid var(--warning)">${log.layer || 'L7'}</span>`;
-            const botBadge = log.isBot ? `<span class="badge" style="background: var(--neon-pink); color: white; margin-left: 4px; box-shadow: 0 0 10px var(--neon-pink)">LLM_BOT</span>` : '';
-            const statusBadge = log.status === 'Blocked'
-                ? `<span class="badge badge-danger" style="background: rgba(255,0,85,0.1); border: 1px solid var(--danger); border-radius: 2px;">TERMINATED</span>`
-                : `<span class="badge badge-success" style="background: rgba(0,255,170,0.1); border: 1px solid var(--success); border-radius: 2px;">CLEAN</span>`;
-
-            row.innerHTML = `
-                <td style="font-family: 'JetBrains Mono'; font-size: 0.7rem; color: var(--text-muted)">${log.time}</td>
-                <td style="font-family: 'JetBrains Mono'; font-weight: 600; color: var(--accent)">${log.ip}</td>
-                <td style="font-size: 0.8rem;">${log.country}</td>
-                <td>${layerBadge}${botBadge}</td>
-                <td style="font-size: 0.8rem;">${log.type}</td>
-                <td style="font-family: 'JetBrains Mono'; font-weight: 700; color: ${log.risk > 0.7 ? 'var(--danger)' : 'var(--accent)'}">${(log.risk * 100).toFixed(0)}</td>
-                <td>${statusBadge}</td>
-            `;
-            logBody.appendChild(row);
-        });
+                row.innerHTML = `
+                    <td style="font-family: 'JetBrains Mono'; font-size: 0.7rem; color: var(--text-muted)">${log.time}</td>
+                    <td style="font-family: 'JetBrains Mono'; font-weight: 600; color: var(--accent)">${log.ip}</td>
+                    <td style="font-size: 0.8rem;">${log.country}</td>
+                    <td>${layerBadge}${botBadge}</td>
+                    <td style="font-size: 0.8rem;">${log.type}</td>
+                    <td style="font-family: 'JetBrains Mono'; font-weight: 700; color: ${log.risk > 0.7 ? 'var(--danger)' : 'var(--accent)'}">${(log.risk * 100).toFixed(0)}</td>
+                    <td>${statusBadge}</td>
+                `;
+                logBody.appendChild(row);
+            });
+        }
 
         updateCharts(data);
     } catch (err) {
@@ -53,9 +54,85 @@ async function fetchStats() {
     }
 }
 
+async function fetchTrafficLogs() {
+    try {
+        const response = await fetch('/api/stats');
+        const data = await response.json();
+        const trafficBody = document.getElementById('traffic-log-body');
+        if (!trafficBody) return;
+
+        trafficBody.innerHTML = '';
+        data.recentLogs.forEach(log => {
+            const row = document.createElement('tr');
+            const riskColor = log.risk > 0.8 ? 'var(--danger)' : (log.risk > 0.4 ? 'var(--warning)' : 'var(--accent)');
+            const payloadSnippet = log.payload ? (log.payload.length > 50 ? log.payload.substring(0, 50) + '...' : log.payload) : 'N/A';
+
+            row.innerHTML = `
+                <td style="font-size: 0.7rem; color: var(--text-muted)">${log.time}</td>
+                <td style="font-weight: 600; color: var(--accent)">${log.ip}</td>
+                <td><span class="badge" style="background:rgba(255,255,255,0.05)">${log.method || 'GET'}</span></td>
+                <td style="font-size: 0.8rem;">${log.url || '/'}</td>
+                <td style="font-family: 'JetBrains Mono'; font-size: 0.7rem; color: var(--text-secondary)"><code>${payloadSnippet}</code></td>
+                <td style="font-weight: 700; color: ${riskColor}">${(log.risk * 100).toFixed(0)}%</td>
+                <td>${log.status === 'Blocked' ? '❌' : '✅'}</td>
+            `;
+            trafficBody.appendChild(row);
+        });
+    } catch (err) {
+        console.error("Traffic Log Fetch Error:", err);
+    }
+}
+
+async function fetchCurrentConfig() {
+    try {
+        const response = await fetch('/api/config');
+        const config = await response.json();
+
+        // Populate inputs
+        if (document.getElementById('ai-version')) document.getElementById('ai-version').value = config.modelVersion;
+        if (document.getElementById('risk-range')) {
+            document.getElementById('risk-range').value = config.riskThreshold;
+            document.getElementById('risk-value').innerText = config.riskThreshold;
+        }
+        if (document.getElementById('protection-mode')) document.getElementById('protection-mode').value = config.protectionMode;
+        if (document.getElementById('target-url')) document.getElementById('target-url').value = config.targetUrl;
+        if (document.getElementById('blocked-countries')) document.getElementById('blocked-countries').value = config.blockedCountries.join(', ');
+    } catch (e) {
+        console.error("Config fetch error:", e);
+    }
+}
+
+async function saveEngineConfig() {
+    const config = {
+        modelVersion: document.getElementById('ai-version')?.value,
+        riskThreshold: parseFloat(document.getElementById('risk-range')?.value),
+        protectionMode: document.getElementById('protection-mode')?.value,
+        targetUrl: document.getElementById('target-url')?.value,
+        blockedCountries: document.getElementById('blocked-countries')?.value.split(',').map(s => s.trim()).filter(s => s)
+    };
+
+    try {
+        const res = await fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+
+        if (res.ok) {
+            alert("✅ SYNAPSE Neural Weights Synchronized Successfully.");
+            fetchStats();
+        } else {
+            alert("❌ Failed to synchronize policy. Check backend connection.");
+        }
+    } catch (e) {
+        alert("❌ Network Error: Sync failed.");
+    }
+}
+
 function updateCharts(data) {
-    // Traffic Chart (Mocked history for visual impact)
-    const ctxTraffic = document.getElementById('trafficChart').getContext('2d');
+    const ctxTraffic = document.getElementById('trafficChart')?.getContext('2d');
+    if (!ctxTraffic) return;
+
     if (trafficChart) trafficChart.destroy();
     trafficChart = new Chart(ctxTraffic, {
         type: 'line',
@@ -63,7 +140,7 @@ function updateCharts(data) {
             labels: ['10m', '8m', '6m', '4m', '2m', 'Now'],
             datasets: [{
                 label: 'Neural Throughput',
-                data: [42, 58, 43, 65, 32, (data.total % 100) + 20], // Hybrid real-time trend
+                data: [42, 58, 43, 65, 32, (data.total % 100) + 20],
                 borderColor: '#00ffff',
                 tension: 0.4,
                 fill: true,
@@ -78,8 +155,9 @@ function updateCharts(data) {
         }
     });
 
-    // Threat Chart
-    const ctxThreat = document.getElementById('threatChart').getContext('2d');
+    const ctxThreat = document.getElementById('threatChart')?.getContext('2d');
+    if (!ctxThreat) return;
+
     if (threatChart) threatChart.destroy();
     const threatLabels = Object.keys(data.threats).filter(k => data.threats[k] > 0);
     const threatData = threatLabels.map(k => data.threats[k]);
@@ -90,14 +168,14 @@ function updateCharts(data) {
             labels: threatLabels,
             datasets: [{
                 data: threatData,
-                backgroundColor: ['#6366f1', '#ef4444', '#f59e0b', '#22c55e', '#8b5cf6'],
+                backgroundColor: ['#00ffff', '#ff0055', '#ffaa00', '#00ffaa', '#ff00ff'],
                 borderWidth: 0
             }]
         },
         options: {
             maintainAspectRatio: false,
             responsive: true,
-            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, usePointStyle: true } } }
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, usePointStyle: true, color: '#888' } } }
         }
     });
 }
@@ -106,12 +184,19 @@ function switchPage(pageId) {
     document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
 
-    document.getElementById(`page-${pageId}`).style.display = 'block';
-    // Mark nav item active
-    const navItems = document.querySelectorAll('.nav-item');
-    navItems.forEach(n => {
-        if (n.innerText.toLowerCase().includes(pageId)) n.classList.add('active');
-    });
+    const targetPage = document.getElementById(`page-${pageId}`);
+    if (targetPage) {
+        targetPage.style.display = 'block';
+        // Select direct children of nav to mark active
+        const navItems = document.querySelectorAll('nav .nav-item');
+        navItems.forEach(n => {
+            if (n.innerText.toLowerCase().includes(pageId)) n.classList.add('active');
+        });
+
+        // Trigger page-specific loads
+        if (pageId === 'traffic') fetchTrafficLogs();
+        if (pageId === 'settings' || pageId === 'intelligence') fetchCurrentConfig();
+    }
 }
 
 function updateRiskValue(val) {
@@ -126,31 +211,7 @@ function toggleSystem() {
     alert("📡 Neural Link Toggled: Manual override engaged.");
 }
 
-async function runSimulation() {
-    const payloads = [
-        { name: 'XSS Breach', url: '/search?q=<script>alert("XSS")</script>' },
-        { name: 'SQL Injection', url: '/api/users?id=1 OR 1=1' },
-        { name: 'Path Traversal', url: '/../../etc/passwd' },
-        { name: 'RCE Attempt', url: '/api/exec?cmd=rm -rf /' },
-        { name: 'Schema Violation', url: '/api/login', body: { username: 123, password: 'password' } }
-    ];
-
-    alert("⚔️ Attack Simulator: Launching neural pressure test...");
-
-    for (const p of payloads) {
-        try {
-            await fetch(p.url, {
-                method: p.body ? 'POST' : 'GET',
-                headers: { 'Content-Type': 'application/json' },
-                body: p.body ? JSON.stringify(p.body) : null
-            });
-            console.log(`Simulated: ${p.name}`);
-        } catch (e) { }
-    }
-
-    setTimeout(fetchStats, 1000);
-}
-
-// Initial Sync
+// Initial Loads
 fetchStats();
+fetchCurrentConfig();
 setInterval(fetchStats, 5000);
