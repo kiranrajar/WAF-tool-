@@ -688,15 +688,15 @@ app.post('/api/unblock', async (req, res) => {
 
 
 
-app.get('/health', (req, res) => res.json({ status: 'active', version: '3.1.0-PROD', environment: IS_VERCEL ? 'Vercel Serverless' : 'Hosted' }));
+app.get('/health', (req, res) => res.json({ status: 'active', version: '4.0.0-PROD', environment: IS_VERCEL ? 'Vercel Serverless' : 'Hosted', engine: 'SYNAPSE-SEND' }));
 
 // Only listen if not in serverless mode (Vercel exports the app)
 if (require.main === module) {
     app.listen(PORT, () => {
-        console.log(`\n🛡️  AEGIS SHIELD v3.1 PROFESSIONAL WAF STARTED`);
-        console.log(`🌐 Proxy Listening:    http://localhost:${PORT}`);
-        console.log(`📊 Security Dashboard: http://localhost:${PORT}/dashboard`);
-        console.log(`🎯 Target Application: ${TARGET_URL}\n`);
+        console.log(`\n🛡️  SYNAPSE: ENDPOINT NEURAL DEFENSE (SEND) STARTED`);
+        console.log(`🌐 Application Gateway: http://localhost:${PORT}`);
+        console.log(`📊 Endpoint SOC:        http://localhost:${PORT}/dashboard`);
+        console.log(`🎯 Protected Machine:   Node OS System\n`);
     });
 }
 

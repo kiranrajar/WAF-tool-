@@ -24,6 +24,11 @@ async function fetchStats() {
         // Overview CPU Stat
         fetchSystemStats();
 
+        // Auto-Refresh Traffic logs if on that page
+        if (document.getElementById('page-traffic').style.display === 'block') {
+            fetchTrafficLogs();
+        }
+
         // Update Overview Log Table
         const logBody = document.getElementById('log-table-body');
         if (logBody) {
@@ -62,20 +67,25 @@ async function fetchTrafficLogs() {
         const trafficBody = document.getElementById('traffic-log-body');
         if (!trafficBody) return;
 
+        if (!data.recentLogs || data.recentLogs.length === 0) {
+            trafficBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 40px; color: var(--text-secondary); font-style: italic;">📡 Monitoring active. Waiting for system traffic packets...</td></tr>';
+            return;
+        }
+
         trafficBody.innerHTML = '';
         data.recentLogs.forEach(log => {
             const row = document.createElement('tr');
-            const riskColor = log.risk > 0.8 ? 'var(--danger)' : (log.risk > 0.4 ? 'var(--warning)' : 'var(--accent)');
-            const payloadSnippet = log.payload ? (log.payload.length > 50 ? log.payload.substring(0, 50) + '...' : log.payload) : 'N/A';
+            const riskColor = log.risk > 0.8 ? 'var(--danger)' : (log.risk > 0.3 ? 'var(--warning)' : 'var(--accent)');
+            const payloadSnippet = log.payload ? (log.payload.length > 40 ? log.payload.substring(0, 40) + '...' : log.payload) : 'SAFE_GET_REQUEST';
 
             row.innerHTML = `
                 <td style="font-size: 0.7rem; color: var(--text-muted)">${log.time}</td>
-                <td style="font-weight: 600; color: var(--accent)">${log.ip}</td>
-                <td><span class="badge" style="background:rgba(255,255,255,0.05)">${log.method || 'GET'}</span></td>
-                <td style="font-size: 0.8rem;">${log.url || '/'}</td>
+                <td style="font-family: 'JetBrains Mono'; font-weight: 600; color: var(--accent)">${log.ip}</td>
+                <td><span class="badge" style="background:rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid var(--border)">${log.method || 'TCP'}</span></td>
+                <td style="font-size: 0.8rem; font-weight: 500;">${log.url || '/'}</td>
                 <td style="font-family: 'JetBrains Mono'; font-size: 0.7rem; color: var(--text-secondary)"><code>${payloadSnippet}</code></td>
-                <td style="font-weight: 700; color: ${riskColor}">${(log.risk * 100).toFixed(0)}%</td>
-                <td>${log.status === 'Blocked' ? '❌' : '✅'}</td>
+                <td style="font-weight: 700; color: ${riskColor}; text-shadow: 0 0 10px ${riskColor}44">${(log.risk * 100).toFixed(0)}%</td>
+                <td style="text-align: center;">${log.status === 'Blocked' ? '🔴 <span style="font-size:0.6rem; color:var(--danger)">DROPPED</span>' : '🟢 <span style="font-size:0.6rem; color:var(--success)">PASSED</span>'}</td>
             `;
             trafficBody.appendChild(row);
         });
@@ -220,9 +230,16 @@ function switchPage(pageId) {
     const targetPage = document.getElementById(`page-${pageId}`);
     if (targetPage) {
         targetPage.style.display = 'block';
-        const navItems = document.querySelectorAll('nav .nav-item');
+
+        // Correctly highlight the corresponding nav item
+        const navItems = document.querySelectorAll('aside nav .nav-item');
         navItems.forEach(n => {
-            if (n.innerText.toLowerCase().includes(pageId)) n.classList.add('active');
+            const text = n.innerText.toLowerCase();
+            if (pageId === 'overview' && text.includes('overview')) n.classList.add('active');
+            if (pageId === 'traffic' && text.includes('streams')) n.classList.add('active');
+            if (pageId === 'system' && text.includes('health')) n.classList.add('active');
+            if (pageId === 'intelligence' && text.includes('logic')) n.classList.add('active');
+            if (pageId === 'settings' && text.includes('policy')) n.classList.add('active');
         });
 
         if (pageId === 'traffic') fetchTrafficLogs();
