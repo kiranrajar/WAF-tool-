@@ -21,6 +21,7 @@
     "http-proxy-middleware": "^3.0.5",
     "mongoose": "^9.0.2",
     "node-cache": "^5.1.2",
+    "systeminformation": "^5.30.5",
     "ua-parser-js": "^1.0.41"
   },
   "devDependencies": {

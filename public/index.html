@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SYNAPSE | Neural SOC & Security Analytics</title>
+    <title>SYNAPSE | Endpoint Neural Defense (SEND)</title>
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono&display=swap"
         rel="stylesheet">
@@ -15,24 +15,27 @@
 <body>
     <aside>
         <div class="logo">
-            <span class="logo-shield">🧠</span> SYNAPSE <span style="font-weight: 300; opacity: 0.8;">NEURAL</span>
+            <span class="logo-shield">🛡️</span> SYNAPSE <span style="font-weight: 300; opacity: 0.8;">ENDPOINT</span>
         </div>
         <nav>
             <div class="nav-item active" onclick="switchPage('overview')">
                 <span>📊</span> Overview
             </div>
             <div class="nav-item" onclick="switchPage('traffic')">
-                <span>📡</span> Traffic Monitor
+                <span>📡</span> Network Streams
+            </div>
+            <div class="nav-item" onclick="switchPage('system')">
+                <span>🖥️</span> System Health
             </div>
             <div class="nav-item" onclick="switchPage('intelligence')">
-                <span>🧠</span> AI & Intelligence
+                <span>🧠</span> Neural Logic
             </div>
             <div class="nav-item" onclick="switchPage('settings')">
-                <span>⚙️</span> Engine Settings
+                <span>⚙️</span> Machine Policy
             </div>
         </nav>
         <div class="nav-item" style="margin-top: auto; opacity: 0.5; font-size: 0.7rem; letter-spacing: 1px;">
-            <span>🔓</span> NEURAL_CORE v3.2.1
+            <span>🔓</span> ENDPOINT_SOLUTIONS v4.0.0
         </div>
     </aside>
 
@@ -41,36 +44,36 @@
         <div id="page-overview" class="page">
             <header>
                 <div class="page-title">
-                    <p>Security Operations Center</p>
-                    <h1>Global Threat Landscape</h1>
+                    <p>Endpoint Protection Center</p>
+                    <h1>Unified Threat Surface</h1>
                 </div>
                 <div class="header-actions">
                     <button class="secondary" onclick="syncThreatFeeds()">🧠 Sync Neural Feed</button>
-                    <button onclick="toggleSystem()" style="box-shadow: 0 0 15px var(--accent-glow)">📡 LINK
-                        ACTIVE</button>
+                    <button onclick="toggleSystem()" style="box-shadow: 0 0 15px var(--accent-glow)">🛡️ OS
+                        PROTECTED</button>
                 </div>
             </header>
 
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="label">Total Requests</div>
+                    <div class="label">System Connections</div>
                     <div class="value" id="stat-total">0</div>
-                    <div class="trend up"><span>↑</span> 12% vs last hour</div>
+                    <div class="trend up"><span>↑</span> Monitoring L3/L4/L7</div>
                 </div>
                 <div class="stat-card">
-                    <div class="label">Blocked Threats</div>
+                    <div class="label">Prevented Attacks</div>
                     <div class="value" id="stat-blocked" style="color: var(--danger);">0</div>
-                    <div class="trend down"><span>↓</span> 3% vs last hour</div>
+                    <div class="trend down"><span>↓</span> Active System Guard</div>
                 </div>
                 <div class="stat-card">
-                    <div class="label">Detection Accuracy</div>
+                    <div class="label">Neural Integrity</div>
                     <div class="value" id="stat-ai">99.8%</div>
-                    <div class="trend up" style="color: var(--accent)"><span>↑</span> SYNAPSE-LLM v3.1</div>
+                    <div class="trend up" style="color: var(--accent)"><span>↑</span> Synapse-SEND v4.0</div>
                 </div>
                 <div class="stat-card">
-                    <div class="label">Threat DB Size</div>
-                    <div class="value" id="stat-db">0</div>
-                    <div class="trend">Static Data Indexed</div>
+                    <div class="label">System CPU Load</div>
+                    <div class="value" id="stat-sys-cpu">0%</div>
+                    <div class="trend">Neural Core Managed</div>
                 </div>
             </div>
 
@@ -127,31 +130,87 @@
                 </div>
             </header>
             <div class="section">
-                <div class="section-header">
-                    <h2>Live Payload Feed</h2>
-                    <div class="header-actions" style="gap: 10px; display: flex;">
-                        <input type="text" placeholder="Search IP/Endpoint..." id="traffic-search"
-                            style="padding: 4px 8px; font-size: 0.7rem; border-radius: 4px; width: 200px;">
-                        <button class="secondary" style="padding: 5px 12px; font-size: 0.7rem;"
-                            onclick="fetchTrafficLogs()">Refresh Feed</button>
-                    </div>
-                </div>
-                <table class="data-table">
+                <table class="log-table">
                     <thead>
                         <tr>
-                            <th>Timestamp</th>
-                            <th>Client IP</th>
-                            <th>Method</th>
+                            <th>Time</th>
+                            <th>Target IP</th>
+                            <th>Proto</th>
                             <th>Endpoint</th>
-                            <th>Payload (Raw)</th>
+                            <th>Payload Intent</th>
                             <th>Risk</th>
-                            <th>Status</th>
+                            <th>State</th>
                         </tr>
                     </thead>
                     <tbody id="traffic-log-body">
                         <!-- Full traffic logs -->
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- System Page -->
+        <div id="page-system" class="page" style="display: none;">
+            <header>
+                <div class="page-title">
+                    <p>OS Diagnostic Layer</p>
+                    <h1>Neural System Health</h1>
+                </div>
+            </header>
+            <div class="controls">
+                <div class="section">
+                    <div class="section-header">
+                        <h2>Hardware Utilization</h2>
+                    </div>
+                    <div style="padding:40px; text-align: center;">
+                        <div style="font-size: 3rem; font-weight: 800; color: var(--accent)" id="sys-cpu-val">0%</div>
+                        <div style="color: var(--text-secondary); margin-bottom: 20px;">Current CPU Load</div>
+
+                        <div
+                            style="height: 10px; background: rgba(255,255,255,0.05); border-radius: 5px; overflow: hidden;">
+                            <div id="cpu-bar"
+                                style="height: 100%; background: var(--accent); width: 0%; transition: width 0.5s ease;">
+                            </div>
+                        </div>
+                    </div>
+                    <div style="padding: 0 24px 24px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <span>Memory Utilization</span>
+                            <span id="sys-mem-val">0%</span>
+                        </div>
+                        <div
+                            style="height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden;">
+                            <div id="mem-bar"
+                                style="height: 100%; background: var(--neon-pink); width: 0%; transition: width 0.5s ease;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="section">
+                    <div class="section-header">
+                        <h2>Infrastructure Telemetry</h2>
+                    </div>
+                    <div style="padding:24px;">
+                        <div style="display: flex; flex-direction: column; gap: 15px;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: var(--text-secondary)">OS Platform:</span>
+                                <span id="sys-platform" style="color: var(--accent)">Detecting...</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: var(--text-secondary)">Uptime:</span>
+                                <span id="sys-uptime" style="color: var(--text-primary)">Calculating...</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: var(--text-secondary)">Network Inbound:</span>
+                                <span id="sys-net-in">0 bps</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: var(--text-secondary)">Network Outbound:</span>
+                                <span id="sys-net-out">0 bps</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 

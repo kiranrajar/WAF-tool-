@@ -24,6 +24,7 @@ const schemaValidator = require('./core/schema-validator');
 const honeytokens = require('./core/honeytokens');
 const virtualPatching = require('./core/virtual-patching');
 const identityGuard = require('./core/identity-guard');
+const si = require('systeminformation');
 
 
 const app = express();
@@ -606,6 +607,27 @@ app.get('/api/config', async (req, res) => {
         }
         res.json({ ...config, blacklist: blacklistIps });
     } catch (e) { res.status(500).send("Config Error"); }
+});
+
+app.get('/api/system', async (req, res) => {
+    try {
+        const cpu = await si.currentLoad();
+        const mem = await si.mem();
+        const net = await si.networkStats();
+        const os = await si.osInfo();
+
+        res.json({
+            cpu: cpu.currentLoad.toFixed(1),
+            memory: ((mem.active / mem.total) * 100).toFixed(1),
+            netIn: net[0]?.rx_sec || 0,
+            netOut: net[0]?.tx_sec || 0,
+            uptime: si.time().uptime,
+            platform: os.platform,
+            distro: os.distro
+        });
+    } catch (e) {
+        res.status(500).json({ error: "System Telemetry Failure" });
+    }
 });
 
 app.post('/api/config', async (req, res) => {

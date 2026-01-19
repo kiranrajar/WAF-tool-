@@ -21,7 +21,8 @@ async function fetchStats() {
             aiIndicator.style.color = riskLevel > 0.3 ? 'var(--danger)' : 'var(--success)';
         }
 
-        document.getElementById('stat-db').innerText = data.threats['OSI Layer 3'] || data.blacklistCount || 0;
+        // Overview CPU Stat
+        fetchSystemStats();
 
         // Update Overview Log Table
         const logBody = document.getElementById('log-table-body');
@@ -186,6 +187,32 @@ function updateCharts(data) {
     });
 }
 
+async function fetchSystemStats() {
+    try {
+        const res = await fetch('/api/system');
+        const data = await res.json();
+
+        // Update Overview Tile
+        const cpuTile = document.getElementById('stat-sys-cpu');
+        if (cpuTile) cpuTile.innerText = data.cpu + '%';
+
+        // Update System Page
+        if (document.getElementById('sys-cpu-val')) {
+            document.getElementById('sys-cpu-val').innerText = data.cpu + '%';
+            document.getElementById('cpu-bar').style.width = data.cpu + '%';
+            document.getElementById('sys-mem-val').innerText = data.memory + '%';
+            document.getElementById('mem-bar').style.width = data.memory + '%';
+
+            document.getElementById('sys-platform').innerText = data.platform.toUpperCase() + ' (' + data.distro + ')';
+            document.getElementById('sys-uptime').innerText = Math.floor(data.uptime / 3600) + ' hrs active';
+            document.getElementById('sys-net-in').innerText = (data.netIn / 1024).toFixed(2) + ' kbps';
+            document.getElementById('sys-net-out').innerText = (data.netOut / 1024).toFixed(2) + ' kbps';
+        }
+    } catch (e) {
+        console.warn("System Sync Error:", e);
+    }
+}
+
 function switchPage(pageId) {
     document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -193,14 +220,13 @@ function switchPage(pageId) {
     const targetPage = document.getElementById(`page-${pageId}`);
     if (targetPage) {
         targetPage.style.display = 'block';
-        // Select direct children of nav to mark active
         const navItems = document.querySelectorAll('nav .nav-item');
         navItems.forEach(n => {
             if (n.innerText.toLowerCase().includes(pageId)) n.classList.add('active');
         });
 
-        // Trigger page-specific loads
         if (pageId === 'traffic') fetchTrafficLogs();
+        if (pageId === 'system') fetchSystemStats();
         if (pageId === 'settings' || pageId === 'intelligence') fetchCurrentConfig();
     }
 }
@@ -214,10 +240,12 @@ async function syncThreatFeeds() {
 }
 
 function toggleSystem() {
-    alert("📡 Neural Link Toggled: Manual override engaged.");
+    alert("🛡️ Neural Link Active: Real-time System Guard engaged.");
 }
 
 // Initial Loads
 fetchStats();
+fetchSystemStats();
 fetchCurrentConfig();
 setInterval(fetchStats, 5000);
+setInterval(fetchSystemStats, 3000);
