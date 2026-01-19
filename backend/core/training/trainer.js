@@ -66,6 +66,6 @@ function trainModel(datasetName) {
     console.log(`💾 Model saved to: /models/${datasetName}/weights.json\n`);
 }
 
-// Train on the new CORTEX LLM profile
-trainModel('cortex-v3.1-llm');
+// Train on the new SYNAPSE LLM profile
+trainModel('synapse-v3.1-llm');
 trainModel('ms-defender');

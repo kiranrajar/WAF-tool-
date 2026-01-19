@@ -1,5 +1,5 @@
 {
-    "modelVersion": "cortex-v3.1-llm",
+    "modelVersion": "synapse-v3.1-llm",
     "riskThreshold": 0.85,
     "protectionMode": "blocking",
     "blockedCountries": [
