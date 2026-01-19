@@ -1,6 +1,6 @@
 /**
- * AEGIS Enterprise Dashboard Logic
- * Professional SOC Implementation
+ * CORTEX AI: Unified Neural Dashboard
+ * Digital Forensics & Semantic Security
  */
 
 let trafficChart, threatChart;
@@ -19,21 +19,21 @@ async function fetchStats() {
         const logBody = document.getElementById('log-table-body');
         logBody.innerHTML = '';
 
-        data.recentLogs.slice(0, 10).forEach(log => {
+        data.recentLogs.slice(0, 15).forEach(log => {
             const row = document.createElement('tr');
-            const layerBadge = log.type === 'Normal' ? '' : `<span class="badge badge-warning">${log.layer || 'L7'}</span>`;
-            const botBadge = log.isBot ? `<span class="badge badge-info" style="background: var(--primary); color: white; margin-left: 4px;">BOT</span>` : '';
+            const layerBadge = log.type === 'Normal' ? '' : `<span class="badge badge-warning" style="border: 1px solid var(--warning)">${log.layer || 'L7'}</span>`;
+            const botBadge = log.isBot ? `<span class="badge" style="background: var(--neon-pink); color: white; margin-left: 4px; box-shadow: 0 0 10px var(--neon-pink)">LLM_BOT</span>` : '';
             const statusBadge = log.status === 'Blocked'
-                ? `<span class="badge badge-danger">Blocked</span>`
-                : `<span class="badge badge-success">Allowed</span>`;
+                ? `<span class="badge badge-danger" style="background: rgba(255,0,85,0.1); border: 1px solid var(--danger); border-radius: 2px;">TERMINATED</span>`
+                : `<span class="badge badge-success" style="background: rgba(0,255,170,0.1); border: 1px solid var(--success); border-radius: 2px;">CLEAN</span>`;
 
             row.innerHTML = `
-                <td style="font-family: 'JetBrains Mono'; font-size: 0.75rem;">${log.time}</td>
-                <td style="font-weight: 600;">${log.ip}</td>
-                <td>${log.country}</td>
+                <td style="font-family: 'JetBrains Mono'; font-size: 0.7rem; color: var(--text-muted)">${log.time}</td>
+                <td style="font-family: 'JetBrains Mono'; font-weight: 600; color: var(--accent)">${log.ip}</td>
+                <td style="font-size: 0.8rem;">${log.country}</td>
                 <td>${layerBadge}${botBadge}</td>
-                <td>${log.type}</td>
-                <td style="font-weight: 700; color: ${log.risk > 0.7 ? 'var(--danger)' : 'var(--text-secondary)'}">${(log.risk * 100).toFixed(0)}%</td>
+                <td style="font-size: 0.8rem;">${log.type}</td>
+                <td style="font-family: 'JetBrains Mono'; font-weight: 700; color: ${log.risk > 0.7 ? 'var(--danger)' : 'var(--accent)'}">${(log.risk * 100).toFixed(0)}</td>
                 <td>${statusBadge}</td>
             `;
             logBody.appendChild(row);

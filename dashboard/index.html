@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AEGIS Enterprise | Security Operations Center</title>
+    <title>CORTEX AI | Neural SOC & Security Analytics</title>
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono&display=swap"
         rel="stylesheet">
@@ -15,7 +15,7 @@
 <body>
     <aside>
         <div class="logo">
-            <span class="logo-shield">🛡️</span> AEGIS <span style="font-weight: 300; opacity: 0.8;">ENTERPRISE</span>
+            <span class="logo-shield">🧠</span> CORTEX <span style="font-weight: 300; opacity: 0.8;">AI</span>
         </div>
         <nav>
             <div class="nav-item active" onclick="switchPage('overview')">
@@ -31,8 +31,8 @@
                 <span>⚙️</span> Engine Settings
             </div>
         </nav>
-        <div class="nav-item" style="margin-top: auto; opacity: 0.5;">
-            <span>🔓</span> Version 4.1.0-PRO
+        <div class="nav-item" style="margin-top: auto; opacity: 0.5; font-size: 0.7rem; letter-spacing: 1px;">
+            <span>🔓</span> NEURAL_CORE v3.2.1
         </div>
     </aside>
 
@@ -45,8 +45,9 @@
                     <h1>Global Threat Landscape</h1>
                 </div>
                 <div class="header-actions">
-                    <button class="secondary" onclick="syncThreatFeeds()">🔄 Sync Threat Feeds</button>
-                    <button onclick="toggleSystem()">🛡️ System Active</button>
+                    <button class="secondary" onclick="syncThreatFeeds()">🧠 Sync Neural Feed</button>
+                    <button onclick="toggleSystem()" style="box-shadow: 0 0 15px var(--accent-glow)">📡 LINK
+                        ACTIVE</button>
                 </div>
             </header>
 
@@ -62,9 +63,9 @@
                     <div class="trend down"><span>↓</span> 3% vs last hour</div>
                 </div>
                 <div class="stat-card">
-                    <div class="label">AI Confidence</div>
+                    <div class="label">Neural Precision</div>
                     <div class="value" id="stat-ai">98.4%</div>
-                    <div class="trend up"><span>↑</span> Model v2.1 Active</div>
+                    <div class="trend up" style="color: var(--accent)"><span>↑</span> CORTEX-LLM v3.1</div>
                 </div>
                 <div class="stat-card">
                     <div class="label">Threat DB Size</div>
@@ -135,8 +136,8 @@
                             <label>Model Version</label>
                             <select id="ai-version">
                                 <option value="v1.0">v1.0 - Heuristic Baseline</option>
-                                <option value="v2.0" selected>v2.0 - Weighted Neural Net</option>
-                                <option value="v3.1">v3.1 - Behavioral Analytics (Early Access)</option>
+                                <option value="ms-defender">v2.5 - Microsoft Defender</option>
+                                <option value="cortex-v3.1-llm" selected>v3.1 - CORTEX Neural LLM</option>
                             </select>
                         </div>
                         <div class="input-group">

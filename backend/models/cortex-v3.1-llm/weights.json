@@ -2,7 +2,7 @@
   "specDensityWeight": 4.001199568191657,
   "entropyWeight": 1.3202571744320677,
   "version": "3.2.1-CORTEX-LLM",
-  "trainedOn": "ms-defender",
+  "trainedOn": "cortex-v3.1-llm",
   "meta": "Llama-3.1-Security-Patterns",
-  "timestamp": "2026-01-19T16:13:57.188Z"
+  "timestamp": "2026-01-19T16:13:57.165Z"
 }

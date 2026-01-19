@@ -1,4 +1,8 @@
 const express = require('express');
+/*
+ * CORTEX AI: Enterprise-Grade Neural WAF
+ * Advanced AI-Powered Security Platform
+ */
 const axios = require('axios');
 const cors = require('cors');
 const fs = require('fs');
@@ -30,14 +34,14 @@ async function sendSOCAlert(data) {
         try {
             await axios.post(DISCORD_WEBHOOK, {
                 embeds: [{
-                    title: `🛡️ AEGIS Shield: Critical Alert`,
+                    title: `🧠 CORTEX AI: Critical Neural Alert`,
                     color: 15548997, // Red
                     fields: [
-                        { name: "Event Type", value: data.type, inline: true },
-                        { name: "IP Address", value: data.ip, inline: true },
-                        { name: "Country", value: data.country, inline: true },
-                        { name: "Risk Score", value: `${(data.risk * 100).toFixed(1)}%`, inline: true },
-                        { name: "Payload", value: `\`\`\`${data.payload?.substring(0, 100) || 'N/A'}\`\`\`` }
+                        { name: "Threat Vector", value: data.type, inline: true },
+                        { name: "Source Core IP", value: data.ip, inline: true },
+                        { name: "Origin", value: data.country, inline: true },
+                        { name: "Risk Index", value: `${(data.risk * 100).toFixed(1)}%`, inline: true },
+                        { name: "Neural Payload", value: `\`\`\`${data.payload?.substring(0, 100) || 'N/A'}\`\`\`` }
                     ],
                     timestamp: new Date().toISOString()
                 }]
@@ -144,30 +148,30 @@ function getBlockPage(ip, reason, incidentId) {
     return `
         <html>
         <head>
-            <title>403 Forbidden - AEGIS Shield</title>
+            <title>403 Forbidden - CORTEX AI</title>
             <style>
-                body { background: #0d1117; color: #c9d1d9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-                .container { background: #161b22; border: 1px solid #30363d; padding: 40px; border-radius: 12px; max-width: 600px; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
-                .icon { font-size: 64px; color: #f85149; margin-bottom: 20px; }
-                h1 { font-size: 24px; color: #f85149; margin-bottom: 10px; }
-                p { line-height: 1.6; color: #8b949e; }
-                .meta { margin-top: 30px; font-family: monospace; font-size: 12px; color: #484f58; background: #0d1117; padding: 15px; border-radius: 6px; text-align: left; }
-                .footer { margin-top: 40px; font-size: 14px; color: #58a6ff; }
+                body { background: #050505; color: #e0e0e0; font-family: 'JetBrains Mono', monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+                .container { background: #0c0c0c; border: 1px solid #1a1a1a; padding: 40px; border-radius: 4px; max-width: 600px; text-align: center; box-shadow: 0 0 30px rgba(0,255,255,0.05); }
+                .icon { font-size: 64px; color: #00ffff; margin-bottom: 20px; text-shadow: 0 0 20px rgba(0,255,255,0.3); }
+                h1 { font-size: 20px; color: #00ffff; margin-bottom: 10px; letter-spacing: 2px; }
+                p { line-height: 1.6; color: #888; font-size: 14px; }
+                .meta { margin-top: 30px; font-family: monospace; font-size: 11px; color: #444; background: #020202; padding: 15px; border-radius: 2px; text-align: left; border-left: 2px solid #00ffff; }
+                .footer { margin-top: 40px; font-size: 12px; color: #333; letter-spacing: 1px; }
             </style>
         </head>
         <body>
             <div class="container">
-                <div class="icon">🛡️</div>
-                <h1>Access Denied by AEGIS Shield</h1>
-                <p>Your request was flagged as a potential security threat and has been blocked by our automated systems.</p>
+                <div class="icon">🧠</div>
+                <h1>NEURAL LINK BLOCKED BY CORTEX AI</h1>
+                <p>Anomalous activity detected. Request terminated by active neural defense protocols.</p>
                 <div class="meta">
-                    [SYSTEM_LOG]<br>
-                    IP: ${ip}<br>
-                    CAUSE: ${reason}<br>
-                    INCIDENT_ID: ${incidentId}<br>
-                    TIME: ${new Date().toISOString()}
+                    [NEURAL_LOG_ENTRY]<br>
+                    IP_ORIGIN: ${ip}<br>
+                    VECTOR: ${reason}<br>
+                    INCIDENT_REF: ${incidentId}<br>
+                    TIMESTAMP: ${new Date().toISOString()}
                 </div>
-                <div class="footer">Protected by AEGIS Shield Enterprise Security</div>
+                <div class="footer">SYSTEM STATUS: ACTIVE | CORTEX NEURAL DEFENSE v3.1</div>
             </div>
         </body>
         </html>
