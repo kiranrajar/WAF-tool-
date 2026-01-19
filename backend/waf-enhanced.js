@@ -1,6 +1,6 @@
 const express = require('express');
 /*
- * CORTEX AI: Enterprise-Grade Neural WAF
+ * SYNAPSE: Enterprise-Grade Neural WAF
  * Advanced AI-Powered Security Platform
  */
 const axios = require('axios');
@@ -34,7 +34,7 @@ async function sendSOCAlert(data) {
         try {
             await axios.post(DISCORD_WEBHOOK, {
                 embeds: [{
-                    title: `🧠 CORTEX AI: Critical Neural Alert`,
+                    title: `🧠 SYNAPSE: Critical Neural Alert`,
                     color: 15548997, // Red
                     fields: [
                         { name: "Threat Vector", value: data.type, inline: true },
@@ -148,7 +148,7 @@ function getBlockPage(ip, reason, incidentId) {
     return `
         <html>
         <head>
-            <title>403 Forbidden - CORTEX AI</title>
+            <title>403 Forbidden - SYNAPSE</title>
             <style>
                 body { background: #050505; color: #e0e0e0; font-family: 'JetBrains Mono', monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
                 .container { background: #0c0c0c; border: 1px solid #1a1a1a; padding: 40px; border-radius: 4px; max-width: 600px; text-align: center; box-shadow: 0 0 30px rgba(0,255,255,0.05); }
@@ -162,7 +162,7 @@ function getBlockPage(ip, reason, incidentId) {
         <body>
             <div class="container">
                 <div class="icon">🧠</div>
-                <h1>NEURAL LINK BLOCKED BY CORTEX AI</h1>
+                <h1>NEURAL LINK BLOCKED BY SYNAPSE</h1>
                 <p>Anomalous activity detected. Request terminated by active neural defense protocols.</p>
                 <div class="meta">
                     [NEURAL_LOG_ENTRY]<br>
@@ -171,7 +171,7 @@ function getBlockPage(ip, reason, incidentId) {
                     INCIDENT_REF: ${incidentId}<br>
                     TIMESTAMP: ${new Date().toISOString()}
                 </div>
-                <div class="footer">SYSTEM STATUS: ACTIVE | CORTEX NEURAL DEFENSE v3.1</div>
+                <div class="footer">SYSTEM STATUS: ACTIVE | SYNAPSE NEURAL DEFENSE v3.1</div>
             </div>
         </body>
         </html>

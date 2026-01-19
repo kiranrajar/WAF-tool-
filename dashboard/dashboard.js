@@ -1,5 +1,5 @@
 /**
- * CORTEX AI: Unified Neural Dashboard
+ * SYNAPSE: Unified Neural Dashboard
  * Digital Forensics & Semantic Security
  */
 

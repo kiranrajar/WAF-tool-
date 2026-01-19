@@ -1,5 +1,5 @@
 /**
- * AEGIS Shield: Multi-Layer Security Engine
+ * SYNAPSE: Multi-Layer Neural Engine
  * Handles OSI Layer 3 (Network), Layer 4 (Transport), and Layer 7 (Application) logic.
  */
 

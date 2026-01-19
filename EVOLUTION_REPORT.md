@@ -1,8 +1,8 @@
-# AEGIS Shield: Project Evolution Report
+# SYNAPSE Neural Defense: Project Evolution Report
 ## Transformation from Visual Concept to Enterprise SOC
 
 ### 1. Executive Summary
-AEGIS Shield has undergone a complete architectural and aesthetic evolution. Initially conceived as a visually-driven proof of concept, it has been transformed into a professional-grade, Next-Generation AI Web Application Firewall (WAF) focused on data density, minimalism, and enterprise-scale security analytics.
+SYNAPSE Neural Defense has undergone a complete architectural and aesthetic evolution. Initially conceived as a visually-driven proof of concept, it has been transformed into a professional-grade, Next-Generation AI Web Application Firewall (WAF) focused on data density, minimalism, and enterprise-scale security analytics.
 
 ### 2. Phase 1: The Initial Concept (The "Childish" Phase)
 The project started with a focus on accessibility and "wow" factor, which resulted in:

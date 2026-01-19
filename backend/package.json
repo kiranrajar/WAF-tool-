@@ -1,5 +1,5 @@
 {
-  "name": "aegis-shield-waf",
+  "name": "synapse-neural-engine",
   "version": "3.0.0",
   "description": "Production-grade AI-powered Web Application Firewall",
   "main": "waf.js",

@@ -1,5 +1,5 @@
 /**
- * AEGIS Shield: AI-driven Detection Engine (v3.1)
+ * SYNAPSE: Neural Detection Engine (v3.1)
  * Supports Model Versioning and Adaptive Weighting
  */
 
